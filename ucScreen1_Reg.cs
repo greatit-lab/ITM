@@ -21,7 +21,7 @@ namespace ITM_Agent.ucPanel
         public ucScreen1_Reg()
         {
             // Form 제목 설정
-            this.Text = Regular Expressions";
+            this.Text = "Regular Expressions";
             
             InitializeComponent();
 
