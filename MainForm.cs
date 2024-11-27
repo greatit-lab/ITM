@@ -10,7 +10,7 @@ namespace ITM_Agent
 {
     public partial class MainForm : Form
     {
-        private string settingsFilePath = Path.Comine(AppDomain.CurrentDomain.BaseDirectory, "Settings.ini");
+        private string settingsFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Settings.ini");
         private List<FileSystemWatcher> watchers = new List<FileSystemWatcher>();
         
         ucPanel.ucScreen1 ucSc1 = new ucPanel.ucScreen1();
