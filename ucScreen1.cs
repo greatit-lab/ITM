@@ -385,7 +385,7 @@ namespace ITM_Agent.ucPanel
 
         private void btn_RegAdd_Click(object sender, EventArgs e)
         {
-            using (var regexForm = new UcScreen1_Reg())
+            using (var regexForm = new ucScreen1_Reg())
             {
                 // ucScreen1을 Owner로 설정
                 regexForm.Owner = this.FindForm();  // FindForm()으로 ucScreen1의 부모 폼(MainForm)을 가져옴
@@ -422,7 +422,7 @@ namespace ITM_Agent.ucPanel
             string targetFolder = selectedItem.Substring(arrowIndex + 2).Trim();
         
             // UcScreen1_Reg 창 생성
-            using (var regexForm = new UcScreen1_Reg())
+            using (var regexForm = new ucScreen1_Reg())
             {
                 regexForm.RegexPattern = regex; // 정규표현식 설정
                 regexForm.TargetFolder = targetFolder; // 폴더 경로 설정
