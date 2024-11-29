@@ -185,40 +185,46 @@ namespace ITM_Agent
 
         private void InitializeFileWatchers()
         {
-            // 기존 Watcher 정리
-            foreach (var watcher in watchers)
+            try
             {
-                watcher.EnableRaisingEvents = false;
-                watcher.Dispose();
-            }
-            watchers.Clear();
-
-            // Target Folders 불러오기
-            var targetFolders = GetFoldersFromSection("[TargetFolders]");
-            var excludeFolders = GetFoldersFromSection("[ExcludeFolders]");
-
-            foreach (var folder in targetFolders)
-            {
-                if (excludeFolders.Any(excluded => folder.StartsWith(excluded)))
+                // 기존 Watcher 정리
+                foreach (var watcher in watchers)
                 {
-                    // 제외된 폴더는 감시하지 않음
-                    continue;
+                    watcher.EnableRaisingEvents = false;
+                    watcher.Dispose();
                 }
-
-                // 파일 감시자 생성
-                var watcher = new FileSystemWatcher
+                watchers.Clear();
+        
+                // Target Folders 불러오기
+                var targetFolders = GetFoldersFromSection("[TargetFolders]");
+                var excludeFolders = GetFoldersFromSection("[ExcludeFolders]");
+        
+                foreach (var folder in targetFolders)
                 {
-                    Path = folder,
-                    IncludeSubdirectories = true,
-                    NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName | NotifyFilters.LastWrite
-                };
-
-                // 이벤트 핸들러 등록
-                watcher.Created += OnFileChanged;
-                watcher.Changed += OnFileChanged;
-                watcher.EnableRaisingEvents = true;
-
-                watchers.Add(watcher);
+                    if (excludeFolders.Any(excluded => folder.StartsWith(excluded)) || !Directory.Exists(folder))
+                    {
+                        continue; // 제외 폴더 및 존재하지 않는 폴더 건너뛰기
+                    }
+        
+                    // 파일 감시자 생성
+                    var watcher = new FileSystemWatcher
+                    {
+                        Path = folder,
+                        IncludeSubdirectories = true,
+                        NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName | NotifyFilters.LastWrite
+                    };
+        
+                    // 이벤트 핸들러 등록
+                    watcher.Created += OnFileChanged;
+                    watcher.Changed += OnFileChanged;
+                    watcher.EnableRaisingEvents = true;
+        
+                    watchers.Add(watcher);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"파일 감시 초기화 중 오류 발생: {ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -236,22 +242,30 @@ namespace ITM_Agent
         {
             try
             {
+                if (!File.Exists(e.FullPath))
+                {
+                    return; // 파일이 삭제되었거나 접근 불가능한 경우 건너뛰기
+                }
+        
                 // 정규표현식과 매칭
                 var regexList = GetRegexListFromSettings();
                 foreach (var regexInfo in regexList)
                 {
                     var regex = regexInfo.Key;
                     var targetFolder = regexInfo.Value;
-
+        
                     if (Regex.IsMatch(e.Name, regex))
                     {
-                        // 매칭된 파일 복사
                         var destinationPath = Path.Combine(targetFolder, Path.GetFileName(e.Name));
                         Directory.CreateDirectory(targetFolder); // 대상 폴더가 없으면 생성
                         File.Copy(e.FullPath, destinationPath, true); // 파일 복사
                         break; // 첫 번째 매칭 후 종료
                     }
                 }
+            }
+            catch (IOException ioEx)
+            {
+                MessageBox.Show($"파일 접근 중 오류 발생: {ioEx.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
             catch (Exception ex)
             {
