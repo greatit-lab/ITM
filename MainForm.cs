@@ -15,6 +15,9 @@ namespace ITM_Agent
         private bool isInitialStatusShown = false; // Ready to Run 상태가 한 번만 표시되도록 제어
         private List<FileSystemWatcher> watchers = new List<FileSystemWatcher>();
         
+        private NotifyIcon trayIcon; // TrayIcon 객체
+        private ContextMenuStrip trayMenu; // TrayIcon 메뉴
+        
         ucPanel.ucScreen1 ucSc1 = new ucPanel.ucScreen1();
         ucPanel.ucScreen2 ucSc2 = new ucPanel.ucScreen2();
         ucPanel.ucScreen3 ucSc3 = new ucPanel.ucScreen3();
@@ -30,6 +33,12 @@ namespace ITM_Agent
             this.Text = $"ITM Agent - {AppVersion}";
             this.MaximizeBox = false;   // 최대화 버튼 비활성화
             btn_Run.Enabled = false; // 초기에는 비활성화
+            
+            // TrayIcon 초기화
+            InitializeTrayIcon();
+
+            // 폼 닫기 버튼 이벤트 설정
+            this.FormClosing += MainForm_FormClosing;
             
             LoadOrCreateSettingsFile();
             
@@ -50,6 +59,126 @@ namespace ITM_Agent
             
             // 목록 상태 변경 이벤트에서 Validate 호출
             ucSc1.ListSelectionChanged += ValidateAndUpdateStatus;
+        }
+        
+        private ToolStripMenuItem titleItem; // MainForm 제목 항목
+        private ToolStripMenuItem runItem; // Run 메뉴 항목
+        private ToolStripMenuItem stopItem; // Stop 메뉴 항목
+        private ToolStripMenuItem quitItem; // Quit 메뉴 항목
+        
+        private void InitializeTrayIcon()
+        {
+            // ContextMenuStrip 생성
+            trayMenu = new ContextMenuStrip();
+        
+            // MainForm 제목 추가
+            titleItem = new ToolStripMenuItem(this.Text);
+            titleItem.Click += (sender, e) => RestoreMainForm(); // 제목 클릭 시 MainForm 복원
+            trayMenu.Items.Add(titleItem);
+        
+            // 구분선 추가
+            trayMenu.Items.Add(new ToolStripSeparator());
+        
+            // Run 메뉴 항목
+            runItem = new ToolStripMenuItem("Run", null, (sender, e) => btn_Run.PerformClick());
+            trayMenu.Items.Add(runItem);
+        
+            // Stop 메뉴 항목
+            stopItem = new ToolStripMenuItem("Stop", null, (sender, e) => btn_Stop.PerformClick());
+            trayMenu.Items.Add(stopItem);
+        
+            // Quit 메뉴 항목
+            quitItem = new ToolStripMenuItem("Quit", null, (sender, e) => PerformQuit());
+
+            trayMenu.Items.Add(quitItem);
+        
+            // NotifyIcon 생성
+            trayIcon = new NotifyIcon
+            {
+                Icon = SystemIcons.Application, // 트레이 아이콘 설정
+                ContextMenuStrip = trayMenu,
+                Visible = true,
+                Text = this.Text
+            };
+        
+            // 더블클릭 시 MainForm 복원
+            trayIcon.DoubleClick += (sender, e) => RestoreMainForm();
+        
+            // 초기 상태 업데이트
+            UpdateTrayMenuStatus();
+        }
+        
+        private void PerformQuit()
+        {
+            try
+            {
+                // 디버깅용 로그
+                Console.WriteLine("PerformQuit: 종료 로직 시작");
+        
+                // FileSystemWatcher 및 기타 리소스 정리
+                StopFileWatchers();
+        
+                // NotifyIcon 리소스 정리
+                trayIcon?.Dispose();
+        
+                // 디버깅용 로그
+                Console.WriteLine("PerformQuit: 리소스 정리 완료");
+        
+                // 애플리케이션 강제 종료
+                Environment.Exit(0);
+        
+                // 디버깅용 로그
+                Console.WriteLine("PerformQuit: 애플리케이션 종료 완료");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"종료 중 오류 발생: {ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+
+        
+        private void UpdateTrayMenuStatus()
+        {
+            if (runItem != null) runItem.Enabled = btn_Run.Enabled;
+            if (stopItem != null) stopItem.Enabled = btn_Stop.Enabled;
+            if (quitItem != null) quitItem.Enabled = btn_Quit.Enabled;
+        }
+        
+        private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            // 폼을 닫을 때 강제로 종료
+            StopFileWatchers();
+            trayIcon?.Dispose();
+            Environment.Exit(0); // 모든 리소스를 정리하고 프로세스 종료
+        }
+
+        
+        private void RestoreMainForm()
+        {
+            // MainForm 활성화
+            this.Show();
+            this.WindowState = FormWindowState.Normal;
+            this.Activate();
+        
+            // MainForm 제목 메뉴 비활성화
+            titleItem.Enabled = false;
+        }
+
+        protected override void OnLoad(EventArgs e)
+        {
+            base.OnLoad(e);
+
+            // MainForm 닫기 버튼 숨기기
+            this.ShowInTaskbar = true; // 작업 표시줄에 표시 여부
+        }
+        
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+        
+            // 창이 처음 표시될 때 제목 메뉴 비활성화
+            titleItem.Enabled = false;
         }
         
         private void ValidateAndUpdateStatus()
@@ -144,6 +273,8 @@ namespace ITM_Agent
                     ucSc1.SetButtonsEnabled(false);
                     break;
             }
+            // TrayIcon 메뉴 상태 동기화
+            UpdateTrayMenuStatus();
         }
         
         private void OnRunButtonStateChanged(bool isEnabled)
@@ -291,7 +422,27 @@ namespace ITM_Agent
                 MessageBox.Show($"파일 감지 중단 중 오류 발생: {ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+        
+        private void btn_Quit_Click(object sender, EventArgs e)
+        {
+            Console.WriteLine("btn_Quit_Click: 이벤트 호출됨");
+        
+            if (ts_Status.Text == "Ready to Run" || ts_Status.Text == "Stopped!")
+            {
+                Console.WriteLine("btn_Quit_Click: PerformQuit 호출");
+                PerformQuit();
+            }
+            else
+            {
+                MessageBox.Show("실행 중에는 종료할 수 없습니다. 먼저 작업을 중지하세요.",
+                                "종료 불가",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Warning);
+            }
+        }
 
+
+        
         private void InitializeFileWatchers()
         {
             foreach (var watcher in watchers)
@@ -328,13 +479,18 @@ namespace ITM_Agent
 
         private void StopFileWatchers()
         {
-            foreach (var watcher in watchers)
+            if (watchers != null)
             {
-                watcher.EnableRaisingEvents = false;
-                watcher.Dispose();
+                foreach (var watcher in watchers)
+                {
+                    watcher.EnableRaisingEvents = false; // 이벤트 비활성화
+                    watcher.Dispose(); // 리소스 해제
+                }
+                watchers.Clear(); // 리스트 초기화
             }
-            watchers.Clear();
         }
+
+
 
         private void OnFileChanged(object sender, FileSystemEventArgs e)
         {
