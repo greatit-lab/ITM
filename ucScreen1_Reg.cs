@@ -27,6 +27,9 @@ namespace ITM_Agent.ucPanel
             // Form 초기화
             InitializeComponent();
 
+            // Form 제목 설정
+            this.Text = "Regular Expressions";
+            
             // tb_RegFolder를 읽기 전용으로 설정
             tb_RegFolder.ReadOnly = true;
 
