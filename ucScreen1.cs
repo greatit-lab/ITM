@@ -11,6 +11,8 @@ namespace ITM_Agent.ucPanel
 {
     public partial class ucScreen1 : UserControl
     {
+        // 상태 업데이트 이벤트 정의
+        public event Action<string, Color> StatusUpdated;
         public event Action<bool> RunButtonStateChanged; // btn_Run 상태 변경 알림 이벤트
         private string settingsFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Settings.ini");
         private string baseFolder;
@@ -420,8 +422,8 @@ namespace ITM_Agent.ucPanel
             string regex = selectedItem.Substring(selectedItem.IndexOf(' ') + 1, arrowIndex - selectedItem.IndexOf(' ') - 2).Trim();
             string targetFolder = selectedItem.Substring(arrowIndex + 2).Trim();
         
-            // UcScreen1_Reg 창 생성
-            using (var regexForm = new ucScreen1_Reg())
+            // ucScreen1_Reg 창 생성
+            using (var regexForm = new ucScreen1_Reg(this)) // 'this'를 전달
             {
                 regexForm.RegexPattern = regex; // 정규표현식 설정
                 regexForm.TargetFolder = targetFolder; // 폴더 경로 설정
@@ -647,6 +649,47 @@ namespace ITM_Agent.ucPanel
         public string BaseFolder
         {
             get => lb_BaseFolder.Text != "폴더가 미선택되었습니다" ? lb_BaseFolder.Text : null;
+        }
+        
+        private void ValidateStatus()
+        {
+            // 각 리스트 및 폴더 상태 확인
+            bool hasTargetFolders = lb_TargetList.Items.Count > 0;
+            bool hasBaseFolder = !string.IsNullOrEmpty(lb_BaseFolder.Text) && lb_BaseFolder.Text != "폴더가 미선택되었습니다";
+            bool hasRegexPatterns = lb_RegexList.Items.Count > 0;
+        
+            // 상태 설정
+            if (!hasTargetFolders || !hasBaseFolder || !hasRegexPatterns)
+            {
+                st_Main.Text = "Stopped!";
+                st_Main.ForeColor = Color.Red;
+            }
+            else
+            {
+                st_Main.Text = "Ready to Run";
+                st_Main.ForeColor = Color.Green;
+            }
+        }
+        
+        private void UpdateStatusOnRun(bool isRunning)
+        {
+            if (isRunning)
+            {
+                st_Main.Text = "Running...";
+                st_Main.ForeColor = Color.Blue;
+            }
+            else
+            {
+                ValidateStatus(); // 실행 중지 시 기존 상태로 복원
+            }
+        }
+        
+        // lb_TargetList, lb_BaseFolder, lb_RegexList 상태 변경 시 호출
+        private void InitializeStatusListeners()
+        {
+            lb_TargetList.SelectedIndexChanged += (sender, e) => ValidateStatus();
+            lb_BaseFolder.TextChanged += (sender, e) => ValidateStatus();
+            lb_RegexList.SelectedIndexChanged += (sender, e) => ValidateStatus();
         }
     }
 }
