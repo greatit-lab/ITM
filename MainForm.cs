@@ -1,6 +1,7 @@
 using ITM_Agent.ucPanel;
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -11,6 +12,8 @@ namespace ITM_Agent
     public partial class MainForm : Form
     {
         private string settingsFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Settings.ini");
+        private bool isInitialStatusShown = false; // Ready to Run 상태가 한 번만 표시되도록 제어
+        
         private List<FileSystemWatcher> watchers = new List<FileSystemWatcher>();
         
         ucPanel.ucScreen1 ucSc1 = new ucPanel.ucScreen1();
@@ -34,11 +37,77 @@ namespace ITM_Agent
             // ucScreen1의 상태 변경 이벤트 구독
             ucSc1.RunButtonStateChanged += OnRunButtonStateChanged;
             
+            // ucScreen1 상태 변경 이벤트 구독
+            ucSc1.StatusUpdated += UpdateMainStatus;
+            
             // MainForm에 ucScreen1 추가
             pMain.Controls.Add(ucSc1);
             
+            // 초기 상태 확인
+            InitializeStatus();
+            
             btn_Run.Click += btn_Run_Click; // Run 버튼 클릭 이벤트 등록
             btn_Stop.Click += btn_Stop_Click; // Stop 버튼 클릭 이벤트 등록
+        }
+        
+        private void InitializeStatus()
+        {
+            if (IsReadyToRun() && !isInitialStatusShown)
+            {
+                UpdateMainStatus("Ready to Run", Color.Green);
+                isInitialStatusShown = true; // 초기 상태는 한 번만 표시
+            }
+            else
+            {
+                UpdateMainStatus("Stopped!", Color.Red);
+            }
+        }
+
+        private bool IsReadyToRun()
+        {
+            // BaseFolder, TargetFolders, Regex 섹션에 최소 1개 이상의 값이 있는지 확인
+            return HasValuesInSection("[BaseFolder]") &&
+                   HasValuesInSection("[TargetFolders]") &&
+                   HasValuesInSection("[Regex]");
+        }
+
+        private bool HasValuesInSection(string section)
+        {
+            if (!File.Exists(settingsFilePath)) return false;
+
+            var lines = File.ReadAllLines(settingsFilePath).ToList();
+            int sectionIndex = lines.FindIndex(line => line.Trim() == section);
+            if (sectionIndex == -1) return false;
+
+            int endIndex = lines.FindIndex(sectionIndex + 1, line =>
+                line.StartsWith("[") || string.IsNullOrWhiteSpace(line));
+            if (endIndex == -1) endIndex = lines.Count;
+
+            // 섹션 내용이 빈 줄이 아닌 항목이 있는지 확인
+            return lines.Skip(sectionIndex + 1).Take(endIndex - sectionIndex - 1).Any(line => !string.IsNullOrWhiteSpace(line));
+        }
+
+        private void UpdateMainStatus(string status, Color color)
+        {
+            ts_Status.Text = status;
+            ts_Status.ForeColor = color;
+
+            // 버튼 활성화/비활성화 상태 제어
+            switch (status)
+            {
+                case "Ready to Run":
+                case "Stopped!":
+                    btn_Run.Enabled = true;
+                    btn_Quit.Enabled = true;
+                    btn_Stop.Enabled = false;
+                    break;
+
+                case "Running...":
+                    btn_Run.Enabled = false;
+                    btn_Quit.Enabled = false;
+                    btn_Stop.Enabled = true;
+                    break;
+            }
         }
         
         private void OnRunButtonStateChanged(bool isEnabled)
@@ -161,7 +230,9 @@ namespace ITM_Agent
         {
             try
             {
-                InitializeFileWatchers();  // 파일 감시 초기화
+                // 파일 감시 시작 (예: ucSc1에서 실행)
+                ucSc1.UpdateStatusOnRun(true); // Running... 상태로 변경
+                UpdateMainStatus("Running...", Color.Blue);
                 MessageBox.Show("파일 변화 감지가 시작되었습니다.", "알림", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
@@ -174,7 +245,9 @@ namespace ITM_Agent
         {
             try
             {
-                StopFileWatchers();  // 파일 감시 중단
+                // 파일 감시 중지 (예: ucSc1에서 실행 중지)
+                ucSc1.UpdateStatusOnRun(false); // 상태 복원
+                UpdateMainStatus("Stopped!", Color.Red);
                 MessageBox.Show("파일 변화 감지가 중지되었습니다.", "알림", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
