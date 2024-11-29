@@ -5,6 +5,7 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace ITM_Agent.ucPanel
@@ -13,7 +14,8 @@ namespace ITM_Agent.ucPanel
     {
         // 상태 업데이트 이벤트 정의
         public event Action<string, Color> StatusUpdated;
-        public event Action<bool> RunButtonStateChanged; // btn_Run 상태 변경 알림 이벤트
+        public event Action ListSelectionChanged;
+        //public event Action<bool> RunButtonStateChanged; // btn_Run 상태 변경 알림 이벤트
         private string settingsFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Settings.ini");
         private string baseFolder;
         private const string TargetFoldersSection = "[TargetFolders]";
@@ -30,7 +32,10 @@ namespace ITM_Agent.ucPanel
             LoadFolders(ExcludeFoldersSection, lb_ExcludeList);
             LoadBaseFolder();
             InitializeFileWatchers();
-
+            
+            // 목록 상태 변경 이벤트 연결
+            InitializeStatusListeners();
+            
             // 이벤트 핸들러 추가
             btn_TargetFolder.Click += (sender, e) => AddFolder(TargetFoldersSection, lb_TargetList);
             btn_TargetRemove.Click += (sender, e) => RemoveFolders(TargetFoldersSection, lb_TargetList);
@@ -65,7 +70,7 @@ namespace ITM_Agent.ucPanel
             bool isRunButtonEnabled = hasTargetFolders && hasBaseFolder && hasRegexPatterns;
 
             // 상태 변경 이벤트 호출
-            RunButtonStateChanged?.Invoke(isRunButtonEnabled);
+            //RunButtonStateChanged?.Invoke(isRunButtonEnabled);
         }
         
         private void LoadBaseFolder()
@@ -653,40 +658,53 @@ namespace ITM_Agent.ucPanel
         
         private void ValidateStatus()
         {
-            // 각 리스트 및 폴더 상태 확인
+            // 각 리스트 상태 확인
             bool hasTargetFolders = lb_TargetList.Items.Count > 0;
-            bool hasBaseFolder = !string.IsNullOrEmpty(lb_BaseFolder.Text) && lb_BaseFolder.Text != "폴더가 미선택되었습니다";
+            bool hasExcludeFolders = lb_ExcludeList.Items.Count > 0;
             bool hasRegexPatterns = lb_RegexList.Items.Count > 0;
-        
-            // 상태 설정
-            if (!hasTargetFolders || !hasBaseFolder || !hasRegexPatterns)
-            {
-                StatusUpdated?.Invoke("Stopped!", Color.Red);
-            }
-            else
+    
+            // 상태 결정 및 이벤트 호출
+            if (hasTargetFolders && hasExcludeFolders && hasRegexPatterns)
             {
                 StatusUpdated?.Invoke("Ready to Run", Color.Green);
             }
+            else
+            {
+                StatusUpdated?.Invoke("Stopped!", Color.Red);
+            }
         }
         
-        private void UpdateStatusOnRun(bool isRunning)
+        public void UpdateStatusOnRun(bool isRunning)
         {
             if (isRunning)
             {
+                // 상태를 "Running..."으로 변경
                 StatusUpdated?.Invoke("Running...", Color.Blue);
             }
             else
             {
-                ValidateStatus(); // 실행 중지 시 기존 상태로 복원
+                // 실행 중지 시 상태 검증
+                ValidateStatus();
             }
         }
         
-        // lb_TargetList, lb_BaseFolder, lb_RegexList 상태 변경 시 호출
         private void InitializeStatusListeners()
         {
-            lb_TargetList.SelectedIndexChanged += (sender, e) => ValidateStatus();
-            lb_BaseFolder.TextChanged += (sender, e) => ValidateStatus();
-            lb_RegexList.SelectedIndexChanged += (sender, e) => ValidateStatus();
+            lb_TargetList.SelectedIndexChanged += (sender, e) => ListSelectionChanged?.Invoke();
+            lb_ExcludeList.SelectedIndexChanged += (sender, e) => ListSelectionChanged?.Invoke();
+            lb_RegexList.SelectedIndexChanged += (sender, e) => ListSelectionChanged?.Invoke();
+        }
+    
+        public void SetButtonsEnabled(bool isEnabled)
+        {
+            btn_TargetFolder.Enabled = isEnabled;
+            btn_TargetRemove.Enabled = isEnabled;
+            btn_ExcludeFolder.Enabled = isEnabled;
+            btn_ExcludeRemove.Enabled = isEnabled;
+            btn_BaseFolder.Enabled = isEnabled;
+            btn_RegAdd.Enabled = isEnabled;
+            btn_RegEdit.Enabled = isEnabled;
+            btn_RegRemove.Enabled = isEnabled;
         }
     }
 }
