@@ -13,7 +13,6 @@ namespace ITM_Agent
     {
         private string settingsFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Settings.ini");
         private bool isInitialStatusShown = false; // Ready to Run 상태가 한 번만 표시되도록 제어
-        
         private List<FileSystemWatcher> watchers = new List<FileSystemWatcher>();
         
         ucPanel.ucScreen1 ucSc1 = new ucPanel.ucScreen1();
@@ -35,7 +34,7 @@ namespace ITM_Agent
             LoadOrCreateSettingsFile();
             
             // ucScreen1의 상태 변경 이벤트 구독
-            ucSc1.RunButtonStateChanged += OnRunButtonStateChanged;
+            //ucSc1.RunButtonStateChanged += OnRunButtonStateChanged;
             
             // ucScreen1 상태 변경 이벤트 구독
             ucSc1.StatusUpdated += UpdateMainStatus;
@@ -48,6 +47,29 @@ namespace ITM_Agent
             
             btn_Run.Click += btn_Run_Click; // Run 버튼 클릭 이벤트 등록
             btn_Stop.Click += btn_Stop_Click; // Stop 버튼 클릭 이벤트 등록
+            
+            // 목록 상태 변경 이벤트에서 Validate 호출
+            ucSc1.ListSelectionChanged += ValidateAndUpdateStatus;
+        }
+        
+        private void ValidateAndUpdateStatus()
+        {
+            // 현재 상태가 "Running..."이면 상태 변경 방지
+            if (ts_Status.Text == "Running...")
+            {
+                return;
+            }
+        
+            // 상태 검증 및 업데이트
+            bool isReadyToRun = IsReadyToRun();
+            if (isReadyToRun)
+            {
+                UpdateMainStatus("Ready to Run", Color.Green);
+            }
+            else
+            {
+                UpdateMainStatus("Stopped!", Color.Red);
+            }
         }
         
         private void InitializeStatus()
@@ -89,23 +111,37 @@ namespace ITM_Agent
 
         private void UpdateMainStatus(string status, Color color)
         {
-            ts_Status.Text = status;
+            ts_Status.Text = status; // 상태 업데이트
             ts_Status.ForeColor = color;
-
-            // 버튼 활성화/비활성화 상태 제어
+        
+            // 상태별 버튼 활성화/비활성화 설정
             switch (status)
             {
                 case "Ready to Run":
-                case "Stopped!":
-                    btn_Run.Enabled = true;
-                    btn_Quit.Enabled = true;
-                    btn_Stop.Enabled = false;
+                    btn_Run.Enabled = true;  // Run 버튼 활성화
+                    btn_Stop.Enabled = false; // Stop 버튼 비활성화
+                    btn_Quit.Enabled = true; // Quit 버튼 활성화
+        
+                    // ucScreen1 내부 버튼 활성화
+                    ucSc1.SetButtonsEnabled(true);
                     break;
-
+        
+                case "Stopped!":
+                    btn_Run.Enabled = true;  // Run 버튼 활성화
+                    btn_Stop.Enabled = false; // Stop 버튼 비활성화
+                    btn_Quit.Enabled = true; // Quit 버튼 활성화
+        
+                    // ucScreen1 내부 버튼 활성화
+                    ucSc1.SetButtonsEnabled(true);
+                    break;
+        
                 case "Running...":
-                    btn_Run.Enabled = false;
-                    btn_Quit.Enabled = false;
-                    btn_Stop.Enabled = true;
+                    btn_Run.Enabled = false; // Run 버튼 비활성화
+                    btn_Stop.Enabled = true;  // Stop 버튼 활성화
+                    btn_Quit.Enabled = false; // Quit 버튼 비활성화
+        
+                    // ucScreen1 내부 버튼 비활성화
+                    ucSc1.SetButtonsEnabled(false);
                     break;
             }
         }
