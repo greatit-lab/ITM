@@ -426,18 +426,6 @@ namespace ITM_Agent.ucPanel
                 regexForm.RegexPattern = regex; // 정규표현식 설정
                 regexForm.TargetFolder = targetFolder; // 폴더 경로 설정
         
-                // ucScreen1 창의 정중앙에 위치하도록 설정
-                var parentForm = this.FindForm(); // ucScreen1의 부모 폼(MainForm)을 가져옴
-                if (parentForm != null)
-                {
-                    // 부모 폼(MainForm)의 화면 위치와 크기를 기준으로 중앙 계산
-                    int centerX = parentForm.Location.X + (parentForm.Width - regexForm.Width) / 2;
-                    int centerY = parentForm.Location.Y + (parentForm.Height - regexForm.Height) / 2;
-        
-                    regexForm.StartPosition = FormStartPosition.Manual;
-                    regexForm.Location = new Point(centerX, centerY);
-                }
-        
                 // 창 활성화
                 if (regexForm.ShowDialog() == DialogResult.OK)
                 {
