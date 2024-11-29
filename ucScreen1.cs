@@ -661,13 +661,11 @@ namespace ITM_Agent.ucPanel
             // 상태 설정
             if (!hasTargetFolders || !hasBaseFolder || !hasRegexPatterns)
             {
-                st_Main.Text = "Stopped!";
-                st_Main.ForeColor = Color.Red;
+                StatusUpdated?.Invoke("Stopped!", Color.Red);
             }
             else
             {
-                st_Main.Text = "Ready to Run";
-                st_Main.ForeColor = Color.Green;
+                StatusUpdated?.Invoke("Ready to Run", Color.Green);
             }
         }
         
@@ -675,8 +673,7 @@ namespace ITM_Agent.ucPanel
         {
             if (isRunning)
             {
-                st_Main.Text = "Running...";
-                st_Main.ForeColor = Color.Blue;
+                StatusUpdated?.Invoke("Running...", Color.Blue);
             }
             else
             {
