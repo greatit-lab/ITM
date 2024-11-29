@@ -385,20 +385,19 @@ namespace ITM_Agent.ucPanel
 
         private void btn_RegAdd_Click(object sender, EventArgs e)
         {
-            using (var regexForm = new ucScreen1_Reg())
+            using (var regexForm = new ucScreen1_Reg(this)) // this 전달
             {
-                // ucScreen1을 Owner로 설정
-                regexForm.Owner = this.FindForm();  // FindForm()으로 ucScreen1의 부모 폼(MainForm)을 가져옴
                 if (regexForm.ShowDialog() == DialogResult.OK)
                 {
                     string regex = regexForm.RegexPattern;
                     string targetFolder = regexForm.TargetFolder;
-
+        
                     AddRegexToList(regex, targetFolder);
                     SaveRegexToSettings();
                 }
             }
         }
+
 
         private void btn_RegEdit_Click(object sender, EventArgs e)
         {
@@ -655,6 +654,11 @@ namespace ITM_Agent.ucPanel
                 }
             }
             return regexList;
+        }
+        
+        public string BaseFolder
+        {
+            get => lb_BaseFolder.Text != "폴더가 미선택되었습니다" ? lb_BaseFolder.Text : null;
         }
     }
 }
