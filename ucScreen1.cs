@@ -308,50 +308,69 @@ namespace ITM_Agent.ucPanel
         {
             using (var folderDialog = new FolderBrowserDialog())
             {
-                // 폴더 선택 대화창의 초기 경로 설정
+                // 초기 경로 설정
                 folderDialog.SelectedPath = string.IsNullOrEmpty(baseFolder) ? AppDomain.CurrentDomain.BaseDirectory : baseFolder;
-
-                // 폴더 선택 대화창 표시
+        
+                // 폴더 선택 대화창
                 if (folderDialog.ShowDialog() == DialogResult.OK)
                 {
                     baseFolder = folderDialog.SelectedPath;
-
+        
                     // 선택된 폴더를 Label에 표시
                     lb_BaseFolder.Text = baseFolder;
-                    lb_BaseFolder.ForeColor = System.Drawing.Color.Black;
-
+                    lb_BaseFolder.ForeColor = Color.Black;
+        
                     // 선택된 폴더를 설정 파일에 저장
                     SaveBaseFolder(baseFolder);
                 }
             }
         }
 
+
         private void SaveBaseFolder(string folderPath)
         {
-            var lines = File.Exists(settingsFilePath) ? File.ReadAllLines(settingsFilePath).ToList() : new List<string>();
-
-            // [BaseFolder] 섹션 처리
-            if (!lines.Contains("[BaseFolder]"))
+            try
             {
-                if (lines.Count > 0 && !string.IsNullOrWhiteSpace(lines.Last()))
+                // 설정 파일 읽기 또는 초기화
+                var lines = File.Exists(settingsFilePath) ? File.ReadAllLines(settingsFilePath).ToList() : new List<string>();
+        
+                // [BaseFolder] 섹션 처리
+                int sectionIndex = lines.IndexOf("[BaseFolder]");
+                if (sectionIndex == -1)
                 {
-                    lines.Add(""); // 섹션 앞에 빈 줄 추가
+                    // [BaseFolder] 섹션이 없으면 새로 추가
+                    if (lines.Count > 0 && !string.IsNullOrWhiteSpace(lines.Last()))
+                    {
+                        lines.Add(""); // 섹션 앞에 빈 줄 추가
+                    }
+                    lines.Add("[BaseFolder]");
+                    lines.Add(folderPath); // 새 폴더 경로 추가
                 }
-                lines.Add("[BaseFolder]");
+                else
+                {
+                    // 기존 섹션 위치 확인
+                    int endIndex = lines.FindIndex(sectionIndex + 1, line => line.StartsWith("[") || string.IsNullOrWhiteSpace(line));
+                    if (endIndex == -1) endIndex = lines.Count;
+        
+                    // 섹션 값 대체
+                    var updatedSection = new List<string> { "[BaseFolder]", folderPath };
+                    lines = lines.Take(sectionIndex)
+                                 .Concat(updatedSection)
+                                 .Concat(lines.Skip(endIndex))
+                                 .ToList();
+                }
+        
+                // 설정 파일 쓰기
+                File.WriteAllLines(settingsFilePath, lines);
             }
-
-            int sectionIndex = lines.IndexOf("[BaseFolder]");
-            int endIndex = lines.FindIndex(sectionIndex + 1, line => line.StartsWith("[") || string.IsNullOrWhiteSpace(line));
-            if (endIndex == -1) endIndex = lines.Count;
-
-            // 기존 BaseFolder 값 제거 후 추가
-            lines = lines.Take(sectionIndex + 1)
-                         .Concat(lines.Skip(endIndex))
-                         .Concat(new[] { folderPath })
-                         .ToList();
-
-            File.WriteAllLines(settingsFilePath, lines);
+            catch (Exception ex)
+            {
+                MessageBox.Show($"설정 파일 저장 중 오류 발생: {ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
+
+
+
         
         private void LoadRegexFromSettings()
         {
@@ -706,5 +725,21 @@ namespace ITM_Agent.ucPanel
             btn_RegEdit.Enabled = isEnabled;
             btn_RegRemove.Enabled = isEnabled;
         }
+        
+        private void DebugSettingsFilePath()
+        {
+            if (!Directory.Exists(Path.GetDirectoryName(settingsFilePath)))
+            {
+                MessageBox.Show($"설정 파일 경로가 올바르지 않습니다: {settingsFilePath}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+        
+            if (!File.Exists(settingsFilePath))
+            {
+                MessageBox.Show($"설정 파일이 없습니다. 새로 생성합니다: {settingsFilePath}", "알림", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                File.Create(settingsFilePath).Dispose();
+            }
+        }
+
     }
 }
