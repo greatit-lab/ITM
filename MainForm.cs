@@ -12,6 +12,13 @@ namespace ITM_Agent
     public partial class MainForm : Form
     {
         private string settingsFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Settings.ini");
+        private readonly string logFolderPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "EventLog");
+        private readonly string logFileName = $"{DateTime.Now:yyyyMMdd}_event.log";
+        // private readonly string logFolderPath = @"C:\Temp\EventLog"; // 권한이 보장된 경로로 설정
+        
+        // 이벤트 핸들러 연결
+        private readonly string debugLogFileName = $"{DateTime.Now:yyyyMMdd}_debug.log";
+        
         private bool isInitialStatusShown = false; // Ready to Run 상태가 한 번만 표시되도록 제어
         private List<FileSystemWatcher> watchers = new List<FileSystemWatcher>();
         
@@ -400,11 +407,21 @@ namespace ITM_Agent
                 // 파일 감시 시작 (예: ucSc1에서 실행)
                 ucSc1.UpdateStatusOnRun(true); // Running... 상태로 변경
                 UpdateMainStatus("Running...", Color.Blue);
-                MessageBox.Show("파일 변화 감지가 시작되었습니다.", "알림", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                
+                // Log start success
+                LogEvent("File monitoring started successfully.");
+                
+                // Debug mode: Create debug. log and log detailed information
+                if (cb_DebugMode.Checked)
+                {
+                    LogEvent("Debug mode is active during Run. Debug logs will be recorded.", true);
+                }
+                MessageBox.Show("File monitoring has started.", "Notification", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"파일 감지 시작 중 오류 발생: {ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                LogEvent($"File monitoring failed to start: {ex.Message}");
+                MessageBox.Show($"An error occurred while starting file monitoring: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -415,11 +432,16 @@ namespace ITM_Agent
                 // 파일 감시 중지 (예: ucSc1에서 실행 중지)
                 ucSc1.UpdateStatusOnRun(false); // 상태 복원
                 UpdateMainStatus("Stopped!", Color.Red);
-                MessageBox.Show("파일 변화 감지가 중지되었습니다.", "알림", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                
+                // Log stop success
+                LogEvent("File monitoring Stopped successfully.");
+                
+                MessageBox.Show("File monitoring has Stopped.", "Notification", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"파일 감지 중단 중 오류 발생: {ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                LogEvent($"File monitoring failed to stop: {ex.Message}");
+                MessageBox.Show($"An error occurred while stopping file monitoring: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
         
@@ -465,15 +487,20 @@ namespace ITM_Agent
                 var watcher = new FileSystemWatcher
                 {
                     Path = folder,
-                    IncludeSubdirectories = true,
+                    IncludeSubdirectories = true,   // Monitor subdirectories
                     NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName | NotifyFilters.LastWrite
                 };
-
+                
+                // Register event handlers for file changes
                 watcher.Created += OnFileChanged;
                 watcher.Changed += OnFileChanged;
+                watcher.Deleted += OnFileChanged;
+                
                 watcher.EnableRaisingEvents = true;
-
                 watchers.Add(watcher);
+                
+                // Log watcher initialization
+                LogEvent($"File watcher initialized for folder: {folder}");
             }
         }
 
@@ -496,24 +523,53 @@ namespace ITM_Agent
         {
             try
             {
+                // Debugging Information
+                Console.WriteLine($"OnFileChanged triggered: {e.ChangeType} - {e.FullPath}");
+                
+                // Log the detected file change
+                string eventType = e.ChangeType.ToString().ToLower();
+                string filePath = e.FullPath;
+                LogEvent($"File {eventType}: {filePath}");
+                
+                if (cb_DebugMode.Checked)
+                {
+                    LogEvent($"Debug: File {eventType} detected at {filePath} by {sender.GetType().Name}.", true);
+                }
+                
+                // Process regex matching and file backup
                 var regexList = GetRegexListFromSettings();
+                bool isMatched = false;
+                
                 foreach (var regexInfo in regexList)
                 {
-                    var regex = regexInfo.Key;
-                    var targetFolder = regexInfo.Value;
-
-                    if (System.Text.RegularExpressions.Regex.IsMatch(e.Name, regex))
+                    string regex = regexInfo.Key;
+                    string targetFolder = regexInfo.Value;
+                    
+                    if (Regex.IsMatch(e.Name, regex))
                     {
-                        var destinationPath = Path.Combine(targetFolder, Path.GetFileName(e.Name));
-                        Directory.CreateDirectory(targetFolder);
-                        File.Copy(e.FullPath, destinationPath, true);
+                        string destinationPath = Path.Combine(targetFolder, Path.GetFileName(e.Name));
+                        Directory.CreateDirectory(targetFolder);    // Ensure target folder exists
+                        File.Copy(filePath, destinationPath, true); // copy the file
+                        
+                        LogEvent($"Regex matched: {regex}, File copied to: {destinationPath}");
+                        if (cb_DebugMode.Checked)
+                        {
+                            LogEvent($"Debug: Regex {regex} matched for {filePath}, copied to {destinationPath}.", trye);
+                        }
+                        
+                        isMatched = true;
                         break;
                     }
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"파일 처리 중 오류 발생: {ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Console.WriteLine($"Error in OnFileChanged: {ex.Message}");
+                LogEvent($"Error while processing file: {ex.Message}");
+                if (cb_DebugMode.Checked)
+                {
+                    LogEvent($"Debug: Error details - {ex}.", true);
+                }
             }
         }
 
@@ -575,6 +631,135 @@ namespace ITM_Agent
                 }
             }
             return regexList;
+        }
+        
+        private void LogEvent(string message, bool isDebug = false)
+        {
+            try
+            {
+                // Console 디버깅 메시지 출력
+                Console.WriteLine($"LogEvent called. Message: {message}, IsDebug: {isDebug}");
+        
+                // Ensure log folder exists
+                if (!Directory.Exists(logFolderPath))
+                {
+                    Console.WriteLine($"Log folder not found. Creating folder: {logFolderPath}");
+                    Directory.CreateDirectory(logFolderPath);
+                }
+        
+                // Determine log file path (event.log or debug.log)
+                string logFilePath = isDebug ? Path.Combine(logFolderPath, debugLogFileName) : Path.Combine(logFolderPath, logFileName);
+        
+                // Rotate log file if size exceeds 5 MB
+                if (File.Exists(logFilePath))
+                {
+                    var fileSize = new FileInfo(logFilePath).Length;
+                    Console.WriteLine($"Log file exists. Current size: {fileSize} bytes");
+        
+                    if (fileSize >= 5 * 1024 * 1024)
+                    {
+                        Console.WriteLine("Log file size exceeded 5MB. Rotating log file...");
+                        string archiveLogFileName = $"{Path.GetFileNameWithoutExtension(logFilePath)}_{GetNextLogIndex()}.log";
+                        string archiveLogFilePath = Path.Combine(logFolderPath, archiveLogFileName);
+                        File.Move(logFilePath, archiveLogFilePath);
+                        Console.WriteLine($"Log file rotated. New archive created: {archiveLogFilePath}");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"Log file not found. Creating new log file: {logFilePath}");
+                }
+        
+                // Write log message
+                using (var writer = new StreamWriter(logFilePath, true))
+                {
+                    string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                    writer.WriteLine($"{timestamp} - {message}");
+                }
+        
+                Console.WriteLine($"Successfully logged message: {message}");
+            }
+            catch (UnauthorizedAccessException uaEx)
+            {
+                Console.WriteLine($"UnauthorizedAccessException: {uaEx.Message}");
+                MessageBox.Show($"Access denied: {uaEx.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            catch (DirectoryNotFoundException dnEx)
+            {
+                Console.WriteLine($"DirectoryNotFoundException: {dnEx.Message}");
+                MessageBox.Show($"Directory not found: {dnEx.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            catch (IOException ioEx)
+            {
+                Console.WriteLine($"IOException: {ioEx.Message}");
+                MessageBox.Show($"IO Error: {ioEx.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"General Exception: {ex.Message}");
+                MessageBox.Show($"Unexpected error: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+        
+        private void TestLogWrite()
+        {
+            string testFolderPath = @"C:\Temp\EventLog";
+            string testLogFilePath = Path.Combine(testFolderPath, "test_log.txt");
+        
+            try
+            {
+                if (!Directory.Exists(testFolderPath))
+                {
+                    Directory.CreateDirectory(testFolderPath);
+                }
+        
+                File.WriteAllText(testLogFilePath, "Test log message.");
+                MessageBox.Show("Log written successfully.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to write log: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+        
+        private void CheckExecutionPath()
+        {
+            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            string currentDir = Environment.CurrentDirectory;
+        
+            MessageBox.Show($"Base Directory: {baseDir}\nCurrent Directory: {currentDir}", "Execution Path", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        
+        private void cb_DebugMode_CheckedChanged(object sender, EventArgs e)
+        {
+            if (cb_DebugMode.Checked)
+            {
+                LogEvent("Debug mode enabled."); // Event log
+                LogEvent("Debug mode has been activated.", true); // Debug log
+            }
+            else
+            {
+                LogEvent("Debug mode disabled."); // Event log
+                LogEvent("Debug mode has been deactivated.", true); // Debug log
+            }
+        }
+        
+        private int GetNextLogIndex()
+        {
+            var existingFiles = Directory.GetFiles(logFolderPath, $"{DateTime.Now:yyyyMMdd}_event_*.log");
+            int maxIndex = 0;
+        
+            foreach (var file in existingFiles)
+            {
+                string fileName = Path.GetFileNameWithoutExtension(file);
+                string[] parts = fileName.Split('_');
+                if (parts.Length > 2 && int.TryParse(parts.Last(), out int index))
+                {
+                    maxIndex = Math.Max(maxIndex, index);
+                }
+            }
+        
+            return maxIndex + 1;
         }
     }
         
