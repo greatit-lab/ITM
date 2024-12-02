@@ -557,7 +557,7 @@ namespace ITM_Agent
                         LogEvent($"Regex matched: {regex}. File copied to: {destinationPath}");
                         if (cb_DebugMode.Checked)
                         {
-                            LogEvent($"Debug: Regex {regex} matched for {filePath}, copied to {destinationPath}.", trye);
+                            LogEvent($"Debug: Regex {regex} matched for {filePath}, copied to {destinationPath}.", true);
                         }
                         
                         isMatched = true;
