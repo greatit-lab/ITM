@@ -473,7 +473,8 @@ namespace ITM_Agent
                 watcher.Dispose();
             }
             watchers.Clear();
-
+            
+            // Load target folders
             var targetFolders = GetFoldersFromSection("[TargetFolders]");
             var excludeFolders = GetFoldersFromSection("[ExcludeFolders]");
 
@@ -481,9 +482,11 @@ namespace ITM_Agent
             {
                 if (excludeFolders.Any(excluded => folder.StartsWith(excluded)))
                 {
+                    // Skip excluded folders
                     continue;
                 }
-
+                
+                // Create a new watcher
                 var watcher = new FileSystemWatcher
                 {
                     Path = folder,
@@ -551,7 +554,7 @@ namespace ITM_Agent
                         Directory.CreateDirectory(targetFolder);    // Ensure target folder exists
                         File.Copy(filePath, destinationPath, true); // copy the file
                         
-                        LogEvent($"Regex matched: {regex}, File copied to: {destinationPath}");
+                        LogEvent($"Regex matched: {regex}. File copied to: {destinationPath}");
                         if (cb_DebugMode.Checked)
                         {
                             LogEvent($"Debug: Regex {regex} matched for {filePath}, copied to {destinationPath}.", trye);
@@ -559,6 +562,15 @@ namespace ITM_Agent
                         
                         isMatched = true;
                         break;
+                    }
+                }
+                
+                if (!isMatched)
+                {
+                    LogEvent($"No regex match found for file: {filePath}");
+                    if (cb_DebugMode.Checked)
+                    {
+                        LogEvent($"Debug: No regex match for {filePath}.", true);
                     }
                 }
             }
