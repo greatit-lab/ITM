@@ -1,6 +1,7 @@
 using ITM_Agent.ucPanel;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -49,6 +50,7 @@ namespace ITM_Agent
             
             LoadOrCreateSettingsFile();
             
+            InitializeFileWatchers();
             // ucScreen1의 상태 변경 이벤트 구독
             //ucSc1.RunButtonStateChanged += OnRunButtonStateChanged;
             
@@ -404,24 +406,20 @@ namespace ITM_Agent
         {
             try
             {
-                // 파일 감시 시작 (예: ucSc1에서 실행)
-                ucSc1.UpdateStatusOnRun(true); // Running... 상태로 변경
+                LogEvent("Run button clicked. Starting monitoring.");
                 UpdateMainStatus("Running...", Color.Blue);
                 
+                foreach (var watcher in watchers)
+                {
+                    watcher.EnableRaisingEvents = true;
+                }
                 // Log start success
                 LogEvent("File monitoring started successfully.");
-                
-                // Debug mode: Create debug. log and log detailed information
-                if (cb_DebugMode.Checked)
-                {
-                    LogEvent("Debug mode is active during Run. Debug logs will be recorded.", true);
-                }
-                MessageBox.Show("File monitoring has started.", "Notification", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
-                LogEvent($"File monitoring failed to start: {ex.Message}");
-                MessageBox.Show($"An error occurred while starting file monitoring: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                LogEvent($"Error starting monitoring: {ex.Message}", true);
+                UpdateMainStatus("Stopped!", Color.Red);
             }
         }
 
@@ -429,19 +427,17 @@ namespace ITM_Agent
         {
             try
             {
-                // 파일 감시 중지 (예: ucSc1에서 실행 중지)
-                ucSc1.UpdateStatusOnRun(false); // 상태 복원
+                LogEvent("Stop button clicked. Stopping monitoring.");
+                foreach (var watcher in watchers)
+                {
+                    watcher.EnableRaisingEvents = false;
+                }
                 UpdateMainStatus("Stopped!", Color.Red);
-                
-                // Log stop success
-                LogEvent("File monitoring Stopped successfully.");
-                
-                MessageBox.Show("File monitoring has Stopped.", "Notification", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                LogEvent("File monitoring stopped successfully.");
             }
             catch (Exception ex)
             {
-                LogEvent($"File monitoring failed to stop: {ex.Message}");
-                MessageBox.Show($"An error occurred while stopping file monitoring: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                LogEvent($"Error stopping monitoring: {ex.Message}", true);
             }
         }
         
@@ -467,21 +463,16 @@ namespace ITM_Agent
         
         private void InitializeFileWatchers()
         {
-            foreach (var watcher in watchers)
-            {
-                watcher.EnableRaisingEvents = false;
-                watcher.Dispose();
-            }
-            watchers.Clear();
+            StopFileWatchers();
             
             // Load target folders
             var targetFolders = GetFoldersFromSection("[TargetFolders]");
-            var excludeFolders = GetFoldersFromSection("[ExcludeFolders]");
 
             foreach (var folder in targetFolders)
             {
-                if (excludeFolders.Any(excluded => folder.StartsWith(excluded)))
+                if (!Directory.Exists(folder))
                 {
+                    LogEvent($"Folder does not exist: {folder}", true);
                     // Skip excluded folders
                     continue;
                 }
@@ -491,7 +482,7 @@ namespace ITM_Agent
                 {
                     Path = folder,
                     IncludeSubdirectories = true,   // Monitor subdirectories
-                    NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName | NotifyFilters.LastWrite
+                    NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite
                 };
                 
                 // Register event handlers for file changes
@@ -499,91 +490,85 @@ namespace ITM_Agent
                 watcher.Changed += OnFileChanged;
                 watcher.Deleted += OnFileChanged;
                 
-                watcher.EnableRaisingEvents = true;
                 watchers.Add(watcher);
-                
-                // Log watcher initialization
-                LogEvent($"File watcher initialized for folder: {folder}");
             }
+            LogEvent($"{watchers.Count} watchers initialized.");
         }
 
         private void StopFileWatchers()
         {
-            if (watchers != null)
+            foreach (var watcher in watchers)
             {
-                foreach (var watcher in watchers)
-                {
-                    watcher.EnableRaisingEvents = false; // 이벤트 비활성화
-                    watcher.Dispose(); // 리소스 해제
-                }
-                watchers.Clear(); // 리스트 초기화
+                watcher.EnableRaisingEvents = false;
+                watcher.Dispose();
             }
+            watchers.Clear();
         }
 
 
 
         private void OnFileChanged(object sender, FileSystemEventArgs e)
         {
-            try
+            if (ts_Status.Text != "Running...")
             {
-                // Debugging Information
-                Console.WriteLine($"OnFileChanged triggered: {e.ChangeType} - {e.FullPath}");
-                
-                // Log the detected file change
-                string eventType = e.ChangeType.ToString().ToLower();
-                string filePath = e.FullPath;
-                LogEvent($"File {eventType}: {filePath}");
-                
-                if (cb_DebugMode.Checked)
+                LogEvent("File event ignored because the status is not Running.", true);
+                return;
+            }
+        
+            LogEvent($"File event detected: {e.ChangeType} - {e.FullPath}");
+        
+            var regexList = GetRegexListFromSettings();
+            bool isFileCopied = false;
+        
+            foreach (var regex in regexList)
+            {
+                if (Regex.IsMatch(e.Name, regex.Key))
                 {
-                    LogEvent($"Debug: File {eventType} detected at {filePath} by {sender.GetType().Name}.", true);
-                }
-                
-                // Process regex matching and file backup
-                var regexList = GetRegexListFromSettings();
-                bool isMatched = false;
-                
-                foreach (var regexInfo in regexList)
-                {
-                    string regex = regexInfo.Key;
-                    string targetFolder = regexInfo.Value;
-                    
-                    if (Regex.IsMatch(e.Name, regex))
+                    string destination = Path.Combine(regex.Value, e.Name);
+        
+                    try
                     {
-                        string destinationPath = Path.Combine(targetFolder, Path.GetFileName(e.Name));
-                        Directory.CreateDirectory(targetFolder);    // Ensure target folder exists
-                        File.Copy(filePath, destinationPath, true); // copy the file
-                        
-                        LogEvent($"Regex matched: {regex}. File copied to: {destinationPath}");
-                        if (cb_DebugMode.Checked)
-                        {
-                            LogEvent($"Debug: Regex {regex} matched for {filePath}, copied to {destinationPath}.", true);
-                        }
-                        
-                        isMatched = true;
-                        break;
+                        Directory.CreateDirectory(regex.Value); // Ensure the destination folder exists
+                        File.Copy(e.FullPath, destination, true); // Attempt to copy the file
+                        LogEvent($"File copied: {e.Name} -> {destination}");
+                        isFileCopied = true;
                     }
-                }
-                
-                if (!isMatched)
-                {
-                    LogEvent($"No regex match found for file: {filePath}");
-                    if (cb_DebugMode.Checked)
+                    catch (UnauthorizedAccessException ex)
                     {
-                        LogEvent($"Debug: No regex match for {filePath}.", true);
+                        LogEvent($"Unauthorized access while copying file: {e.FullPath}. Error: {ex.Message}", true);
                     }
+                    catch (DirectoryNotFoundException ex)
+                    {
+                        LogEvent($"Directory not found for file: {e.FullPath}. Error: {ex.Message}", true);
+                    }
+                    catch (PathTooLongException ex)
+                    {
+                        LogEvent($"Path too long for file: {e.FullPath}. Error: {ex.Message}", true);
+                    }
+                    catch (FileNotFoundException ex)
+                    {
+                        LogEvent($"File not found during copy: {e.FullPath}. Error: {ex.Message}", true);
+                    }
+                    catch (IOException ex)
+                    {
+                        LogEvent($"IO error while copying file: {e.FullPath}. Error: {ex.Message}", true);
+                    }
+                    catch (Exception ex)
+                    {
+                        LogEvent($"Unexpected error during file copy: {e.FullPath}. Error: {ex.Message}", true);
+                    }
+        
+                    break; // Stop processing other regex patterns once a match is found
                 }
             }
-            catch (Exception ex)
+        
+            if (!isFileCopied)
             {
-                Console.WriteLine($"Error in OnFileChanged: {ex.Message}");
-                LogEvent($"Error while processing file: {ex.Message}");
-                if (cb_DebugMode.Checked)
-                {
-                    LogEvent($"Debug: Error details - {ex}.", true);
-                }
+                LogEvent($"No matching regex for file: {e.FullPath}");
             }
         }
+
+
 
         private List<string> GetFoldersFromSection(string section)
         {
@@ -616,30 +601,13 @@ namespace ITM_Agent
         private Dictionary<string, string> GetRegexListFromSettings()
         {
             var regexList = new Dictionary<string, string>();
-            if (File.Exists(settingsFilePath))
+            var lines = File.ReadAllLines(settingsFilePath);
+            foreach (var line in lines)
             {
-                var lines = File.ReadAllLines(settingsFilePath);
-                bool inRegexSection = false;
-
-                foreach (var line in lines)
+                var parts = line.Split(new[] { "->" }, StringSplitOptions.None);
+                if (parts.Length == 2)
                 {
-                    if (line.Trim() == "[Regex]")
-                    {
-                        inRegexSection = true;
-                        continue;
-                    }
-
-                    if (inRegexSection)
-                    {
-                        if (string.IsNullOrWhiteSpace(line) || line.StartsWith("["))
-                            break;
-
-                        var parts = line.Split(new[] { "->" }, StringSplitOptions.None);
-                        if (parts.Length == 2)
-                        {
-                            regexList[parts[0].Trim()] = parts[1].Trim();
-                        }
-                    }
+                    regexList.Add(parts[0].Trim(), parts[1].Trim());
                 }
             }
             return regexList;
@@ -649,67 +617,18 @@ namespace ITM_Agent
         {
             try
             {
-                // Console 디버깅 메시지 출력
-                Console.WriteLine($"LogEvent called. Message: {message}, IsDebug: {isDebug}");
-        
-                // Ensure log folder exists
-                if (!Directory.Exists(logFolderPath))
-                {
-                    Console.WriteLine($"Log folder not found. Creating folder: {logFolderPath}");
-                    Directory.CreateDirectory(logFolderPath);
-                }
-        
-                // Determine log file path (event.log or debug.log)
                 string logFilePath = isDebug ? Path.Combine(logFolderPath, debugLogFileName) : Path.Combine(logFolderPath, logFileName);
-        
-                // Rotate log file if size exceeds 5 MB
-                if (File.Exists(logFilePath))
-                {
-                    var fileSize = new FileInfo(logFilePath).Length;
-                    Console.WriteLine($"Log file exists. Current size: {fileSize} bytes");
-        
-                    if (fileSize >= 5 * 1024 * 1024)
-                    {
-                        Console.WriteLine("Log file size exceeded 5MB. Rotating log file...");
-                        string archiveLogFileName = $"{Path.GetFileNameWithoutExtension(logFilePath)}_{GetNextLogIndex()}.log";
-                        string archiveLogFilePath = Path.Combine(logFolderPath, archiveLogFileName);
-                        File.Move(logFilePath, archiveLogFilePath);
-                        Console.WriteLine($"Log file rotated. New archive created: {archiveLogFilePath}");
-                    }
-                }
-                else
-                {
-                    Console.WriteLine($"Log file not found. Creating new log file: {logFilePath}");
-                }
-        
-                // Write log message
+                Directory.CreateDirectory(logFolderPath);
+
                 using (var writer = new StreamWriter(logFilePath, true))
                 {
                     string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
                     writer.WriteLine($"{timestamp} - {message}");
                 }
-        
-                Console.WriteLine($"Successfully logged message: {message}");
-            }
-            catch (UnauthorizedAccessException uaEx)
-            {
-                Console.WriteLine($"UnauthorizedAccessException: {uaEx.Message}");
-                MessageBox.Show($"Access denied: {uaEx.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-            catch (DirectoryNotFoundException dnEx)
-            {
-                Console.WriteLine($"DirectoryNotFoundException: {dnEx.Message}");
-                MessageBox.Show($"Directory not found: {dnEx.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-            catch (IOException ioEx)
-            {
-                Console.WriteLine($"IOException: {ioEx.Message}");
-                MessageBox.Show($"IO Error: {ioEx.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"General Exception: {ex.Message}");
-                MessageBox.Show($"Unexpected error: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Logging failed: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
         
