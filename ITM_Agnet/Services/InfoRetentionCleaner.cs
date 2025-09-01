@@ -24,7 +24,8 @@ namespace ITM_Agent.Services
         private static readonly Regex RxHyphen = new Regex(@"(?<!\d)(?<date>\d{4}-\d{2}-\d{2})(?!\d)", RegexOptions.Compiled);
         private static readonly Regex RxYmd = new Regex(@"(?<!\d)(?<ymd>\d{8})(?!\d)", RegexOptions.Compiled);
 
-        private const int SCAN_INTERVAL_MS = 5 * 60 * 1000;   // 5분 간격
+        //private const int SCAN_INTERVAL_MS = 60 * 60 * 1000;    // 60분 간격
+        private const int SCAN_INTERVAL_MS = 10 * 60 * 1000;
 
         public InfoRetentionCleaner(SettingsManager settingsManager)
         {
