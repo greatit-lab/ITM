@@ -65,6 +65,8 @@ namespace ITM_Agent
             InitializeUserControls();
             RegisterMenuEvents();
 
+            ucImageTransPanel.ImageSaveFolderChanged += ucUploadPanel.LoadImageSaveFolder_PathChanged;
+
             // 설정 패널
             ucSc1 = new ucPanel.ucConfigurationPanel(settingsManager);
             // Override Names 패널 (Designer에서 배치된 ucConfigPanel 컨트롤 인스턴스 전달)
@@ -547,9 +549,9 @@ namespace ITM_Agent
             // 4) 이미지 병합(PDF 변환) 패널
             ucImageTransPanel = new ucImageTransPanel(settingsManager, ucConfigPanel);
 
-            // 5) 업로드 패널 – OverrideNamesPanel 참조 추가됨 (4번째 인자)
+            // 5) ▼▼▼ UploadPanel 생성자에 ucImageTransPanel 인스턴스를 전달하도록 수정 ▼▼▼
             ucUploadPanel = new ucUploadPanel(
-                ucConfigPanel, ucPluginPanel, settingsManager, ucOverrideNamesPanel);
+                ucConfigPanel, ucPluginPanel, settingsManager, ucOverrideNamesPanel, ucImageTransPanel);
 
             // 6) **새 옵션 패널 생성**
             ucOptionPanel = new ucOptionPanel(settingsManager);
