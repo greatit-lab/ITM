@@ -189,7 +189,7 @@ namespace ITM_Agent.ucPanel
             cb_FlatPlugin.Items.Clear();
             cb_PreAlignPlugin.Items.Clear();
             cb_ErrPlugin.Items.Clear();
-            cb_ImgPath.Items.Clear(); // ▼▼▼ PDF 이미지 경로 콤보박스 초기화 ▼▼▼
+            cb_ImagePlugin.Items.Clear(); // ▼▼▼ PDF 이미지 플러그인 콤보박스 초기화 ▼▼▼
 
             if (pluginPanel == null) return;
 
@@ -198,7 +198,7 @@ namespace ITM_Agent.ucPanel
                 cb_FlatPlugin.Items.Add(p.PluginName);
                 cb_PreAlignPlugin.Items.Add(p.PluginName);
                 cb_ErrPlugin.Items.Add(p.PluginName);
-                cb_ImgPath.Items.AddRange(arr); // ▼▼▼ PDF 이미지 경로 콤보박스에 폴더 목록 추가 ▼▼▼
+                cb_ImagePlugin.Items.Add(p.PluginName); // ▼▼▼ PDF 이미지 플러그인 콤보박스에 목록 추가 ▼▼▼
             }
         }
 
