@@ -1,4 +1,4 @@
-// Library\ConnectInfo.cs
+// Library/DatabaseInfo.cs
 using System;
 using Npgsql;   // ★ MySql → Npgsql 교체
 
@@ -7,11 +7,14 @@ namespace ConnectInfo
     public sealed class DatabaseInfo
     {
         /* ── 하드코딩 예시는 그대로 두고 포트만 PostgreSQL 기본값(5432) ── */
-        private const string _server   = "00.000.00.00";
+        private const string _server = "00.000.00.00";
         private const string _database = "itm";
-        private const string _userId   = "userid";
+        private const string _userId = "userid";
         private const string _password = "pw";
-        private const int    _port     = 5432;
+        private const int _port = 5432;
+
+        // 외부에서 서버 주소를 참조할 수 있도록 public 속성 추가
+        public string ServerAddress => _server;
 
         private DatabaseInfo() { }
         public static DatabaseInfo CreateDefault() => new DatabaseInfo();
@@ -23,13 +26,13 @@ namespace ConnectInfo
         {
             var csb = new NpgsqlConnectionStringBuilder
             {
-                Host     = _server,
+                Host = _server,
                 Database = _database,
                 Username = _userId,
                 Password = _password,
-                Port     = _port,
+                Port = _port,
                 Encoding = "UTF8",
-                SslMode  = SslMode.Disable,   // 필요 시 Enable 로 변경
+                SslMode = SslMode.Disable,   // 필요 시 Enable 로 변경
                 // ▼ 기본 스키마를 public 으로 지정
                 SearchPath = "public"
             };
@@ -60,7 +63,7 @@ namespace ConnectInfo
         private readonly string _host = DatabaseInfo.CreateDefault().ServerAddress;
 
         // ▼▼▼ FileZilla Server에서 설정한 포트 번호 (FTPS 기본값: 21) ▼▼▼
-        private const int    _port = 21;
+        private const int _port = 21;
 
         // ▼▼▼ FileZilla Server에서 생성한 사용자 계정 정보 ▼▼▼
         private const string _username = "itm_agent_user";
