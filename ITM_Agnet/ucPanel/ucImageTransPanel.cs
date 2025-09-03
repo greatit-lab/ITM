@@ -30,6 +30,9 @@ namespace ITM_Agent.ucPanel
         // 실행 중 여부 (MainForm의 btn_Run으로 제어)
         private bool isRunning = false;
 
+        // ▼▼▼ 외부 패널에 폴더 변경을 알리기 위한 이벤트 선언 ▼▼▼
+        public event Action ImageSaveFolderChanged;
+
         public ucImageTransPanel(SettingsManager settingsManager, ucConfigurationPanel configPanel)
         {
             this.settingsManager = settingsManager ?? throw new ArgumentNullException(nameof(settingsManager));
@@ -53,6 +56,16 @@ namespace ITM_Agent.ucPanel
             LoadRegexFolderPaths();
             LoadWaitTimes();
             LoadOutputFolder();
+        }
+
+        // ▼▼▼ 외부에서 현재 설정된 저장 폴더 경로를 가져갈 수 있는 public 메서드 추가 ▼▼▼
+        public string GetImageSaveFolder()
+        {
+            if (lb_ImageSaveFolder.Text.Contains("not set"))
+            {
+                return string.Empty;
+            }
+            return lb_ImageSaveFolder.Text;
         }
 
         #region ====== MainForm에서 실행/중지 제어 ======
@@ -357,6 +370,9 @@ namespace ITM_Agent.ucPanel
                     string selectedFolder = folderDialog.SelectedPath;
                     lb_ImageSaveFolder.Text = selectedFolder;
                     settingsManager.SetValueToSection("ImageTrans", "SaveFolder", selectedFolder);
+
+                    // ▼▼▼ 폴더가 성공적으로 변경되었음을 외부에 알림 ▼▼▼
+                    ImageSaveFolderChanged?.Invoke();
 
                     logManager.LogEvent($"[ucImageTransPanel] Output folder set: {selectedFolder}");
                     MessageBox.Show("출력 폴더가 설정되었습니다.", "알림", MessageBoxButtons.OK, MessageBoxIcon.Information);
