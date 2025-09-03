@@ -16,7 +16,6 @@ namespace ITM_Agent.ucPanel
 {
     public partial class ucUploadPanel : UserControl
     {
-        // [수정] 큐에 데이터 타입을 식별할 수 있는 'string' 추가
         private readonly ConcurrentQueue<Tuple<string, string, string>> uploadQueue = new ConcurrentQueue<Tuple<string, string, string>>();
         private readonly CancellationTokenSource ctsUpload = new CancellationTokenSource();
         private HashSet<string> prevPluginNames;
@@ -26,17 +25,23 @@ namespace ITM_Agent.ucPanel
         private SettingsManager settingsManager;
         private LogManager logManager;
         private readonly ucOverrideNamesPanel overridePanel;
+        private readonly ucImageTransPanel imageTransPanel; // ▼▼▼ ImageTransPanel 참조 필드 추가 ▼▼▼
 
+        // 각 데이터 타입별 FileSystemWatcher 선언
         private FileSystemWatcher uploadFolderWatcher;
         private FileSystemWatcher preAlignFolderWatcher;
         private FileSystemWatcher errFolderWatcher;
+        private FileSystemWatcher imageFolderWatcher; // ▼▼▼ PDF 이미지용 Watcher 추가 ▼▼▼
 
+        // Settings.ini 키 상수 선언
         private const string UploadSection = "UploadSetting";
         private const string UploadKey_WaferFlat = "WaferFlat";
         private const string UploadKey_PreAlign = "PreAlign";
         private const string UploadKey_Error = "Error";
+        private const string UploadKey_Image = "Image"; // ▼▼▼ PDF 이미지용 키 추가 ▼▼▼
 
-        public ucUploadPanel(ucConfigurationPanel configPanel, ucPluginPanel pluginPanel, SettingsManager settingsManager, ucOverrideNamesPanel ovPanel)
+        public ucUploadPanel(ucConfigurationPanel configPanel, ucPluginPanel pluginPanel, SettingsManager settingsManager,
+            ucOverrideNamesPanel ovPanel, ucImageTransPanel imageTransPanel)
         {
             InitializeComponent();
 
@@ -44,11 +49,12 @@ namespace ITM_Agent.ucPanel
             this.pluginPanel = pluginPanel ?? throw new ArgumentNullException(nameof(pluginPanel));
             this.settingsManager = settingsManager ?? throw new ArgumentNullException(nameof(settingsManager));
             this.overridePanel = ovPanel;
+            this.imageTransPanel = imageTransPanel ?? throw new ArgumentNullException(nameof(imageTransPanel)); // ▼▼▼ 참조 할당 ▼▼▼
 
             logManager = new LogManager(AppDomain.CurrentDomain.BaseDirectory);
-
             this.pluginPanel.PluginsChanged += PluginPanel_PluginsChanged;
 
+            // 기존 버튼 이벤트 핸들러
             btn_FlatSet.Click += btn_FlatSet_Click;
             btn_FlatClear.Click += btn_FlatClear_Click;
             btn_PreAlignSet.Click += btn_PreAlignSet_Click;
@@ -56,13 +62,14 @@ namespace ITM_Agent.ucPanel
             btn_ErrSet.Click += btn_ErrSet_Click;
             btn_ErrClear.Click += btn_ErrClear_Click;
 
+            // ▼▼▼ PDF 이미지용 버튼 이벤트 핸들러 연결 ▼▼▼
+            btn_ImgSet.Click += btn_ImgSet_Click;
+            btn_ImgClear.Click += btn_ImgClear_Click;
+
             this.Load += UcUploadPanel_Load;
 
-            DeduplicateComboItems(cb_WaferFlat_Path);
-            DeduplicateComboItems(cb_PreAlign_Path);
-            DeduplicateComboItems(cb_ErrPath);
-
-            LoadTargetFolderItems();
+            LoadTargetFolderItems(); // ImagePath 로드 로직은 여기서 제거됨
+            LoadImageSaveFolder_PathChanged(); // ▼▼▼ ImageTransPanel로부터 경로를 가져오는 메서드 호출 ▼▼▼
             LoadPluginItems();
 
             prevPluginNames = new HashSet<string>(
@@ -72,6 +79,26 @@ namespace ITM_Agent.ucPanel
             LoadUploadSettings();
 
             Task.Run(() => ConsumeUploadQueueAsync(ctsUpload.Token));
+        }
+
+        /// <summary>
+        /// ImageTransPanel의 저장 폴더가 변경될 때 호출되는 이벤트 핸들러입니다.
+        /// </summary>
+        public void LoadImageSaveFolder_PathChanged()
+        {
+            cb_ImgPath.Items.Clear();
+            string imageSaveFolder = this.imageTransPanel.GetImageSaveFolder();
+
+            if (!string.IsNullOrEmpty(imageSaveFolder))
+            {
+                cb_ImgPath.Items.Add(imageSaveFolder);
+                cb_ImgPath.SelectedIndex = 0; // 자동으로 선택
+                cb_ImgPath.Enabled = false;   // ▼▼▼ 사용자가 직접 수정하지 못하도록 비활성화 ▼▼▼
+            }
+            else
+            {
+                cb_ImgPath.Enabled = false; // 경로가 없으면 비활성화
+            }
         }
 
         private void LoadUploadSettings()
@@ -87,6 +114,10 @@ namespace ITM_Agent.ucPanel
             string errLine = settingsManager.GetValueFromSection(UploadSection, UploadKey_Error);
             if (!string.IsNullOrWhiteSpace(errLine))
                 RestoreUploadSetting("Error", errLine);
+
+            // ▼▼▼ PDF 이미지 설정 로드 추가 ▼▼▼
+            string imgLine = settingsManager.GetValueFromSection(UploadSection, UploadKey_Image);
+            if (!string.IsNullOrWhiteSpace(imgLine)) RestoreUploadSetting("Image", imgLine);
         }
 
         private void RestoreUploadSetting(string itemName, string valueLine)
@@ -116,8 +147,14 @@ namespace ITM_Agent.ucPanel
             {
                 AddPathToCombo(cb_ErrPath, folderPath);
                 AddPathToCombo(cb_ErrPlugin, pluginName);
-                DeduplicateComboItems(cb_ErrPath);
                 StartErrFolderWatcher(NormalizePath(folderPath));
+            }
+            else if (itemName == "Image")
+            {
+                // Image 경로는 ImageTransPanel에서 받아오므로, 여기서는 플러그인만 설정
+                // AddPathToCombo(cb_ImgPath, folderPath); 
+                AddPathToCombo(cb_ImagePlugin, pluginName);
+                StartImageFolderWatcher(NormalizePath(folderPath));
             }
         }
 
@@ -152,6 +189,7 @@ namespace ITM_Agent.ucPanel
             cb_FlatPlugin.Items.Clear();
             cb_PreAlignPlugin.Items.Clear();
             cb_ErrPlugin.Items.Clear();
+            cb_ImgPath.Items.Clear(); // ▼▼▼ PDF 이미지 경로 콤보박스 초기화 ▼▼▼
 
             if (pluginPanel == null) return;
 
@@ -160,6 +198,7 @@ namespace ITM_Agent.ucPanel
                 cb_FlatPlugin.Items.Add(p.PluginName);
                 cb_PreAlignPlugin.Items.Add(p.PluginName);
                 cb_ErrPlugin.Items.Add(p.PluginName);
+                cb_ImgPath.Items.AddRange(arr); // ▼▼▼ PDF 이미지 경로 콤보박스에 폴더 목록 추가 ▼▼▼
             }
         }
 
@@ -248,6 +287,51 @@ namespace ITM_Agent.ucPanel
             logManager.LogEvent($"[UploadPanel] (Error) 대기 큐 추가 : {e.FullPath}");
         }
 
+        // ▼▼▼ PDF 이미지용 Watcher Event 및 Start 메서드 추가 ▼▼▼
+        private void StartImageFolderWatcher(string folderPath)
+        {
+            try
+            {
+                folderPath = folderPath.Trim();
+                if (string.IsNullOrEmpty(folderPath)) throw new ArgumentException("폴더 경로가 비어 있습니다.", nameof(folderPath));
+                if (!Directory.Exists(folderPath)) Directory.CreateDirectory(folderPath);
+
+                imageFolderWatcher?.Dispose();
+                imageFolderWatcher = new FileSystemWatcher(folderPath)
+                {
+                    Filter = "*.pdf", // PDF 파일만 감시
+                    IncludeSubdirectories = false,
+                    NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite,
+                    EnableRaisingEvents = true
+                };
+                imageFolderWatcher.Created += ImageFolderWatcher_Event;
+                logManager.LogEvent($"[UploadPanel] Image (PDF) 폴더 감시 시작: {folderPath}");
+            }
+            catch (Exception ex)
+            {
+                logManager.LogError($"[UploadPanel] Image (PDF) 폴더 감시 시작 실패: {ex.Message}");
+            }
+        }
+
+        private void ImageFolderWatcher_Event(object sender, FileSystemEventArgs e)
+        {
+            Thread.Sleep(200);
+            string pluginName = string.Empty;
+
+            if (InvokeRequired)
+                Invoke(new MethodInvoker(() => pluginName = cb_ImagePlugin.Text.Trim()));
+            else
+                pluginName = cb_ImagePlugin.Text.Trim();
+
+            if (string.IsNullOrEmpty(pluginName))
+            {
+                logManager.LogEvent($"[UploadPanel] Image 플러그인이 설정되지 않아 처리를 건너뜁니다: {e.FullPath}");
+                return;
+            }
+            uploadQueue.Enqueue(new Tuple<string, string, string>(e.FullPath, pluginName, "Image"));
+            logManager.LogEvent($"[UploadPanel] 대기 큐에 추가 (Image): {e.FullPath}");
+        }
+
         private async Task ConsumeUploadQueueAsync(CancellationToken token)
         {
             while (!token.IsCancellationRequested)
@@ -262,15 +346,13 @@ namespace ITM_Agent.ucPanel
 
                     string rawPath = job.Item1;
                     string pluginName = job.Item2;
-                    string dataType = job.Item3; // 데이터 타입 가져오기
+                    string dataType = job.Item3;
                     string readyPath = rawPath;
 
-                    // [수정] 플러그인 이름 대신 데이터 타입을 기준으로 Override 로직 실행 여부 결정
+                    // ▼▼▼ WaferFlat 데이터 타입일 때만 Override 로직 실행 ▼▼▼
                     if (dataType == "WaferFlat")
                     {
-                        readyPath = overridePanel != null
-                            ? overridePanel.EnsureOverrideAndReturnPath(rawPath, 180_000)
-                            : rawPath;
+                        readyPath = overridePanel?.EnsureOverrideAndReturnPath(rawPath, 180_000) ?? rawPath;
                     }
                     else
                     {
@@ -286,8 +368,7 @@ namespace ITM_Agent.ucPanel
                         continue;
                     }
 
-                    string err;
-                    if (!TryRunProcessAndUpload(pluginItem.AssemblyPath, readyPath, out err))
+                    if (!TryRunProcessAndUpload(pluginItem.AssemblyPath, readyPath, out string err))
                     {
                         logManager.LogError($"[UploadPanel] 업로드 실패: {Path.GetFileName(readyPath)} - ({pluginName}) - {err}");
                     }
@@ -335,6 +416,7 @@ namespace ITM_Agent.ucPanel
             DeduplicateComboItems(cb_WaferFlat_Path);
             DeduplicateComboItems(cb_PreAlign_Path);
             DeduplicateComboItems(cb_ErrPath);
+            DeduplicateComboItems(cb_ImgPath); // ▼▼▼ 중복 제거 추가 ▼▼▼
         }
 
         private void btn_FlatSet_Click(object sender, EventArgs e)
@@ -378,6 +460,44 @@ namespace ITM_Agent.ucPanel
             MessageBox.Show("Wafer-Flat 설정이 초기화되었습니다.", "완료", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
+        // ▼▼▼ PDF 이미지용 버튼 클릭 이벤트 핸들러 구현 ▼▼▼
+        private void btn_ImgSet_Click(object sender, EventArgs e)
+        {
+            string rawFolder = cb_ImgPath.Text.Trim();
+            string rawPlugin = cb_ImagePlugin.Text.Trim();
+            if (string.IsNullOrEmpty(rawFolder) || string.IsNullOrEmpty(rawPlugin))
+            {
+                MessageBox.Show("Image Data 폴더와 플러그인을 모두 선택하세요.", "알림", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            if (!Directory.Exists(rawFolder))
+            {
+                MessageBox.Show("존재하지 않는 폴더입니다.", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            string normalizedFolder = NormalizePath(rawFolder);
+            string iniValue = $"Folder : {normalizedFolder}, Plugin : {rawPlugin}";
+            settingsManager.SetValueToSection(UploadSection, UploadKey_Image, iniValue);
+            AddPathToCombo(cb_ImgPath, rawFolder);
+            AddPathToCombo(cb_ImagePlugin, rawPlugin);
+            DeduplicateComboItems(cb_ImgPath);
+            StartImageFolderWatcher(normalizedFolder);
+            MessageBox.Show("Image Data 설정이 저장되었습니다.", "완료", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        private void btn_ImgClear_Click(object sender, EventArgs e)
+        {
+            cb_ImgPath.SelectedIndex = -1;
+            cb_ImgPath.Text = string.Empty;
+            cb_ImagePlugin.SelectedIndex = -1;
+            cb_ImagePlugin.Text = string.Empty;
+            imageFolderWatcher?.Dispose();
+            imageFolderWatcher = null;
+            settingsManager.RemoveKeyFromSection(UploadSection, UploadKey_Image);
+            MessageBox.Show("Image Data 설정이 초기화되었습니다.", "완료", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
         private void PluginPanel_PluginsChanged(object sender, EventArgs e)
         {
             RefreshPluginCombo();
@@ -393,7 +513,7 @@ namespace ITM_Agent.ucPanel
                 RemovePluginReferences(removed);
             }
 
-            ComboBox[] targets = { cb_FlatPlugin, cb_PreAlignPlugin, cb_ErrPlugin };
+            ComboBox[] targets = { cb_FlatPlugin, cb_PreAlignPlugin, cb_ErrPlugin, cb_ImagePlugin }; // ▼▼▼ cb_ImagePlugin 추가 ▼▼▼
             foreach (var cb in targets)
             {
                 string previouslySelected = cb.Text;
@@ -419,6 +539,7 @@ namespace ITM_Agent.ucPanel
             if (string.Equals(cb_FlatPlugin.Text, pluginName, StringComparison.OrdinalIgnoreCase)) btn_FlatClear_Click(this, EventArgs.Empty);
             if (string.Equals(cb_PreAlignPlugin.Text, pluginName, StringComparison.OrdinalIgnoreCase)) btn_PreAlignClear_Click(this, EventArgs.Empty);
             if (string.Equals(cb_ErrPlugin.Text, pluginName, StringComparison.OrdinalIgnoreCase)) btn_ErrClear_Click(this, EventArgs.Empty);
+            if (string.Equals(cb_ImagePlugin.Text, pluginName, StringComparison.OrdinalIgnoreCase)) btn_ImgClear_Click(this, EventArgs.Empty); // ▼▼▼ 추가 ▼▼▼
         }
 
         private bool TryRunProcessAndUpload(string dllPath, string readyPath, out string err)
@@ -441,13 +562,14 @@ namespace ITM_Agent.ucPanel
 
                 object[] args;
                 var parameters = mi.GetParameters();
-                if (parameters.Length == 3)
+                if (parameters.Length >= 2 && (parameters[1].ParameterType == typeof(string) || parameters[1].ParameterType == typeof(object)))
                 {
-                    args = new object[] { readyPath, null, null };
-                }
-                else if (parameters.Length == 2)
-                {
-                    args = new object[] { readyPath, Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Settings.ini") };
+                    args = new object[] { readyPath, Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Settings.ini"), null };
+                    // 3개 파라미터 메서드를 위해 인자 개수 조정
+                    if (parameters.Length == 2)
+                    {
+                        Array.Resize(ref args, 2);
+                    }
                 }
                 else
                 {
@@ -475,6 +597,7 @@ namespace ITM_Agent.ucPanel
             btn_FlatClear.Enabled = enabled;
             btn_PreAlignSet.Enabled = enabled;
             btn_PreAlignClear.Enabled = enabled;
+            // ▼▼▼ PDF 이미지용 컨트롤 활성화/비활성화 추가 ▼▼▼
             btn_ImgSet.Enabled = enabled;
             btn_ImgClear.Enabled = enabled;
             btn_ErrSet.Enabled = enabled;
