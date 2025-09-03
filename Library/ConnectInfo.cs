@@ -50,4 +50,33 @@ namespace ConnectInfo
             }
         }
     }
+
+    /// <summary>
+    /// FileZilla Server (FTPS) 접속 정보를 관리합니다.
+    /// </summary>
+    public sealed class FtpsInfo
+    {
+        // ▼▼▼ DB와 FTP 서버가 동일하므로, DatabaseInfo의 서버 주소를 그대로 사용합니다. ▼▼▼
+        private readonly string _host = DatabaseInfo.CreateDefault().ServerAddress;
+
+        // ▼▼▼ FileZilla Server에서 설정한 포트 번호 (FTPS 기본값: 21) ▼▼▼
+        private const int    _port = 21;
+
+        // ▼▼▼ FileZilla Server에서 생성한 사용자 계정 정보 ▼▼▼
+        private const string _username = "itm_agent_user";
+        private const string _password = "your_filezilla_password";
+
+        // PDF 파일이 저장될 서버의 기본 경로
+        private const string _uploadPath = "/";
+
+        // 외부에서 사용할 수 있도록 속성(Property)으로 정보를 노출합니다.
+        public string Host => _host;
+        public int Port => _port;
+        public string Username => _username;
+        public string Password => _password;
+        public string UploadPath => _uploadPath;
+
+        private FtpsInfo() { }
+        public static FtpsInfo CreateDefault() => new FtpsInfo();
+    }
 }
