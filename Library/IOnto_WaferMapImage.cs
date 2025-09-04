@@ -2,11 +2,12 @@
 using System;
 using System.Data;
 using System.IO;
-using System.Net; // FtpWebRequest 사용
+using System.Net;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
-using ConnectInfo; // FtpsInfo, DatabaseInfo 참조
-using ITM_Agent.Services; // TimeSyncProvider 참조
+using ConnectInfo;
+using ITM_Agent.Services;
 using Npgsql;
 
 // 1. 네임스페이스 변경
@@ -140,19 +141,25 @@ namespace Onto_WaferMapImageLib
             string dateFolder = DateTime.Now.ToString("yyyyMMdd");
 
             string remoteDirectory = $"{sdwt}/{eqpid}/{dateFolder}";
+            string remoteFileUriString = $"ftp://{ftpsInfo.Host}:{ftpsInfo.Port}/{remoteDirectory}/{fileName}";
+            string finalUri = $"ftps://{ftpsInfo.Host}/{remoteDirectory}/{fileName}";
 
             try
             {
+                ServicePointManager.ServerCertificateValidationCallback =
+                    (sender, certificate, chain, sslPolicyErrors) => true;
+
                 EnsureRemoteDirectoryExists(ftpsInfo, sdwt);
                 EnsureRemoteDirectoryExists(ftpsInfo, $"{sdwt}/{eqpid}");
                 EnsureRemoteDirectoryExists(ftpsInfo, remoteDirectory);
 
-                string remoteFileUri = $"ftp://{ftpsInfo.Host}:{ftpsInfo.Port}/{remoteDirectory}/{fileName}";
-
-                FtpWebRequest request = (FtpWebRequest)WebRequest.Create(remoteFileUri);
+                FtpWebRequest request = (FtpWebRequest)WebRequest.Create(remoteFileUriString);
+                request.Method = WebRequestMethods.Ftp.UploadFile;
                 request.Method = WebRequestMethods.Ftp.UploadFile;
                 request.Credentials = new NetworkCredential(ftpsInfo.Username, ftpsInfo.Password);
                 request.EnableSsl = true;
+                request.UsePassive = false;
+                request.KeepAlive = false;
 
                 using (var fileStream = File.OpenRead(localFilePath))
                 using (var requestStream = request.GetRequestStream())
@@ -165,12 +172,69 @@ namespace Onto_WaferMapImageLib
                     SimpleLogger.Event($"FTPS upload complete: {fileName} to {remoteDirectory}, Status: {response.StatusCode}");
                 }
 
-                return $"ftps://{ftpsInfo.Host}/{remoteDirectory}/{fileName}";
+                return finalUri;
+            }
+            catch (WebException wex)
+            {
+                // ★★★ 핵심 수정: 425 오류가 발생했을 때, 파일이 실제로 존재하는지 재확인합니다. ★★★
+                var ftpResponse = wex.Response as FtpWebResponse;
+                if (ftpResponse != null && (int)ftpResponse.StatusCode == 425)
+                {
+                    SimpleLogger.Event($"FTPS upload for {fileName} returned 425 error. Verifying file existence on server...");
+                    // 잠시 후 파일이 완전히 기록될 시간을 줍니다.
+                    Thread.Sleep(500); 
+                    if (RemoteFileExists(ftpsInfo, remoteDirectory, fileName))
+                    {
+                        SimpleLogger.Event($"Verification successful. File '{fileName}' exists on FTPS server. Treating as success.");
+                        return finalUri; // 파일이 존재하므로 성공으로 처리
+                    }
+                }
+                
+                // 그 외 다른 오류이거나, 파일 존재 확인에 실패한 경우
+                SimpleLogger.Error($"FTPS upload failed for {fileName}. EX: {wex.Message}");
+                return null;
             }
             catch (Exception ex)
             {
                 SimpleLogger.Error($"FTPS upload failed for {fileName}. EX: {ex.Message}");
                 return null;
+            }
+        }
+
+        private bool RemoteFileExists(FtpsInfo ftpsInfo, string directory, string fileName)
+        {
+            try
+            {
+                string remoteFileUri = $"ftp://{ftpsInfo.Host}:{ftpsInfo.Port}/{directory}/{fileName}";
+                var request = (FtpWebRequest)WebRequest.Create(remoteFileUri);
+                request.Method = WebRequestMethods.Ftp.GetFileSize;
+                request.Credentials = new NetworkCredential(ftpsInfo.Username, ftpsInfo.Password);
+                request.EnableSsl = true;
+                request.UsePassive = false;
+                request.KeepAlive = false;
+
+                using (var response = (FtpWebResponse)request.GetResponse())
+                {
+                    // 응답을 성공적으로 받으면 파일이 존재하는 것
+                    return true;
+                }
+            }
+            catch (WebException ex)
+            {
+                // 파일이 없으면 '550 File unavailable' 오류가 발생하며, 이는 정상적인 '없음' 상태입니다.
+                var response = ex.Response as FtpWebResponse;
+                if (response != null && response.StatusCode == FtpStatusCode.ActionNotTakenFileUnavailable)
+                {
+                    return false; // 파일이 존재하지 않음
+                }
+                // 그 외의 네트워크 오류 등
+                SimpleLogger.Debug($"RemoteFileExists check failed for {fileName}. EX: {ex.Message}");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                SimpleLogger.Debug($"RemoteFileExists check failed with a general exception for {fileName}. EX: {ex.Message}");
+                return false;
             }
         }
 
