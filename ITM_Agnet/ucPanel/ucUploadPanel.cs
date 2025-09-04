@@ -352,7 +352,7 @@ namespace ITM_Agent.ucPanel
                     // ▼▼▼ WaferFlat 데이터 타입일 때만 Override 로직 실행 ▼▼▼
                     if (dataType == "WaferFlat")
                     {
-                        readyPath = overridePanel?.EnsureOverrideAndReturnPath(rawPath, 180_000) ?? rawPath;
+                        readyPath = overridePanel?.EnsureOverrideAndReturnPath(rawPath, 3000) ?? rawPath;
                     }
                     else
                     {
