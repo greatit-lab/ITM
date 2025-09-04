@@ -238,9 +238,9 @@ namespace Onto_WaferMapImageLib
                 File.Delete(filePath);
                 SimpleLogger.Debug($"Local file deleted: {filePath}");
             }
-            catch (Exception ex) 
-            { 
-                SimpleLogger.Error($"Failed to delete local file {filePath}: {ex.Message}"); 
+            catch (Exception ex)
+            {
+                SimpleLogger.Error($"Failed to delete local file {filePath}: {ex.Message}");
             }
         }
 
