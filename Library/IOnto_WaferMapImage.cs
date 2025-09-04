@@ -1,4 +1,4 @@
-// Library\IOnto_WaferMapImage.cs
+// Library/IOnto_WaferMapImage.cs
 using System;
 using System.Data;
 using System.IO;
@@ -10,7 +10,7 @@ using ITM_Agent.Services; // TimeSyncProvider 참조
 using Npgsql;
 
 // 1. 네임스페이스 변경
-namespace Onto_WaferMapImageLib 
+namespace Onto_WaferMapImageLib
 {
     /* ──────────────────────── Logger ──────────────────────── */
     internal static class SimpleLogger
@@ -66,7 +66,7 @@ namespace Onto_WaferMapImageLib
                 SimpleLogger.Error("Eqpid not found in Settings.ini. Aborting process.");
                 return;
             }
-            
+
             string fileUri = null;
 
             try
@@ -74,7 +74,7 @@ namespace Onto_WaferMapImageLib
                 string sdwt = GetSdwtFromDatabase(eqpid);
                 if (string.IsNullOrEmpty(sdwt))
                 {
-                    return; 
+                    return;
                 }
 
                 fileUri = UploadToFtps(filePath, sdwt, eqpid);
@@ -84,7 +84,7 @@ namespace Onto_WaferMapImageLib
                 }
 
                 InsertToDatabase(filePath, eqpid, fileUri);
-                
+
                 // 5. 모든 작업 성공 시 로컬 원본 파일 삭제
                 TryDeleteLocalFile(filePath);
 
@@ -95,11 +95,11 @@ namespace Onto_WaferMapImageLib
                 SimpleLogger.Error($"Unhandled EX in ProcessAndUpload for {filePath} ▶ {ex.GetBaseException().Message}");
                 if (fileUri != null)
                 {
-                     SimpleLogger.Error($"CRITICAL: File was uploaded to FTPS ({fileUri}) but DB insert or local file deletion failed. Manual check required.");
+                    SimpleLogger.Error($"CRITICAL: File was uploaded to FTPS ({fileUri}) but DB insert or local file deletion failed. Manual check required.");
                 }
             }
         }
-        
+
         private string GetSdwtFromDatabase(string eqpid)
         {
             try
@@ -132,15 +132,15 @@ namespace Onto_WaferMapImageLib
                 return null;
             }
         }
-        
+
         private string UploadToFtps(string localFilePath, string sdwt, string eqpid)
         {
             var ftpsInfo = FtpsInfo.CreateDefault();
             string fileName = Path.GetFileName(localFilePath);
             string dateFolder = DateTime.Now.ToString("yyyyMMdd");
-            
+
             string remoteDirectory = $"{sdwt}/{eqpid}/{dateFolder}";
-            
+
             try
             {
                 EnsureRemoteDirectoryExists(ftpsInfo, sdwt);
@@ -148,7 +148,7 @@ namespace Onto_WaferMapImageLib
                 EnsureRemoteDirectoryExists(ftpsInfo, remoteDirectory);
 
                 string remoteFileUri = $"ftp://{ftpsInfo.Host}:{ftpsInfo.Port}/{remoteDirectory}/{fileName}";
-                
+
                 FtpWebRequest request = (FtpWebRequest)WebRequest.Create(remoteFileUri);
                 request.Method = WebRequestMethods.Ftp.UploadFile;
                 request.Credentials = new NetworkCredential(ftpsInfo.Username, ftpsInfo.Password);
@@ -164,7 +164,7 @@ namespace Onto_WaferMapImageLib
                 {
                     SimpleLogger.Event($"FTPS upload complete: {fileName} to {remoteDirectory}, Status: {response.StatusCode}");
                 }
-                
+
                 return $"ftps://{ftpsInfo.Host}/{remoteDirectory}/{fileName}";
             }
             catch (Exception ex)
@@ -184,7 +184,7 @@ namespace Onto_WaferMapImageLib
                 request.Credentials = new NetworkCredential(ftpsInfo.Username, ftpsInfo.Password);
                 request.EnableSsl = true;
 
-                using (request.GetResponse()){}
+                using (request.GetResponse()) { }
             }
             catch (WebException ex)
             {
@@ -196,7 +196,7 @@ namespace Onto_WaferMapImageLib
                 }
             }
         }
-        
+
         private void InsertToDatabase(string localFilePath, string eqpid, string fileUri)
         {
             string fileName = Path.GetFileName(localFilePath);
@@ -206,7 +206,7 @@ namespace Onto_WaferMapImageLib
             using (var conn = new NpgsqlConnection(dbInfo.GetConnectionString()))
             {
                 conn.Open();
-                
+
                 const string sql = @"
                     INSERT INTO public.plg_wf_map 
                         (eqpid, datetime, file_uri, original_filename, serv_ts)
@@ -228,15 +228,15 @@ namespace Onto_WaferMapImageLib
                 }
             }
         }
-        
+
         #region Helper Methods
-        
+
         private void TryDeleteLocalFile(string filePath)
         {
-            try 
-            { 
-                File.Delete(filePath); 
-                SimpleLogger.Debug($"Local file deleted: {filePath}"); 
+            try
+            {
+                File.Delete(filePath);
+                SimpleLogger.Debug($"Local file deleted: {filePath}");
             }
             catch (Exception ex) 
             { 
@@ -246,7 +246,7 @@ namespace Onto_WaferMapImageLib
 
         private DateTime ExtractDateTimeFromFileName(string fileName)
         {
-            try 
+            try
             {
                 string[] parts = fileName.Split('_');
                 if (parts.Length >= 2)
@@ -263,7 +263,7 @@ namespace Onto_WaferMapImageLib
             for (int i = 0; i < maxRetries; i++)
             {
                 if (!File.Exists(path)) return false;
-                try 
+                try
                 {
                     using (File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                     {
