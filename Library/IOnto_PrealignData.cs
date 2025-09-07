@@ -1,4 +1,4 @@
-// Library\IOnto_PrealignData.cs
+// Library/IOnto_PrealignData.cs
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -13,7 +13,7 @@ using ConnectInfo;
 using Npgsql;
 using ITM_Agent.Services; // ★ using 구문 확인
 
-namespace PrealignDataLib
+namespace Onto_PrealignDataLib
 {
     /*──────────────────────── Logger ────────────────────────*/
     internal static class SimpleLogger
