@@ -1,4 +1,4 @@
-// Library\IOnto_ErrorData.cs
+// Library/IOnto_ErrorData.cs
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -11,7 +11,7 @@ using System.Threading;
 using Npgsql;
 using ConnectInfo;
 
-namespace ErrorDataLib
+namespace Onto_ErrorDataLib
 {
     /*──────────────────────── Logger ───────────────────────*/
     internal static class SimpleLogger
