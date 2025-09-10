@@ -277,6 +277,7 @@ namespace Onto_WaferMapImageLib
                 using (var cmd = new NpgsqlCommand(sql, conn))
                 {
                     DateTime serv_kst = TimeSyncProvider.Instance.ToSynchronizedKst(fileDateTime);
+                    serv_kst = new DateTime(serv_kst.Year, serv_kst.Month, serv_kst.Day, serv_kst.Hour, serv_kst.Minute, serv_kst.Second);
 
                     cmd.Parameters.AddWithValue("@eqpid", eqpid);
                     cmd.Parameters.AddWithValue("@datetime", fileDateTime);
