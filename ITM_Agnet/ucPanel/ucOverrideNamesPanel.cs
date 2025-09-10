@@ -123,6 +123,7 @@ namespace ITM_Agent.ucPanel
                         stableFiles.Add(filePath);
                     }
                 }
+
                 if (stableFiles.Count > 0)
                 {
                     foreach (var filePath in stableFiles)
@@ -488,7 +489,7 @@ namespace ITM_Agent.ucPanel
                     }
                     return newFilePath;
                 }
-                
+
                 using (File.Create(newFilePath)) { }
 
                 return newFilePath;
@@ -773,7 +774,7 @@ namespace ITM_Agent.ucPanel
                         return null;
 
                     string newPath = Path.Combine(Path.GetDirectoryName(targetFile), newName);
-                    
+
                     const int maxRetries = 10;
                     for (int i = 0; i < maxRetries; i++)
                     {
