@@ -91,12 +91,12 @@ namespace ITM_Agent.ucPanel
         private void CheckFileStability()
         {
             var now = DateTime.Now;
-            List<string> stableFiles = new List<string>();
+            var stableFiles = new List<string>();
 
-            // 1) 현재 딕셔너리 상태 스냅샷 확보
+            // 1) 안정화된 파일 목록을 찾고, 추적 목록에서 즉시 제거
             lock (trackingLock)
             {
-                var snapshot = trackedFiles.ToList(); // KeyValuePair<string, FileTrackingInfo>
+                var snapshot = trackedFiles.ToList();
                 foreach (var kv in snapshot)
                 {
                     string filePath = kv.Key;
@@ -123,20 +123,9 @@ namespace ITM_Agent.ucPanel
                         stableFiles.Add(filePath);
                     }
                 }
-            }
-
-            // 2) 안정화된 파일 처리
-            foreach (var filePath in stableFiles)
-            {
-                ProcessStableFile(filePath);
-            }
-
-            // 3) 처리 완료된 파일은 Dictionary에서 제거
-            lock (trackingLock)
-            {
-                foreach (var filePath in stableFiles)
+                if (stableFiles.Count > 0)
                 {
-                    if (trackedFiles.ContainsKey(filePath))
+                    foreach (var filePath in stableFiles)
                     {
                         trackedFiles.Remove(filePath);
                     }
@@ -148,6 +137,12 @@ namespace ITM_Agent.ucPanel
                     stabilityTimer.Dispose();
                     stabilityTimer = null;
                 }
+            } // lock 끝
+
+            // 2) 잠금(lock) 외부에서 실제 파일 처리 수행
+            foreach (var filePath in stableFiles)
+            {
+                ProcessStableFile(filePath);
             }
         }
 
@@ -485,31 +480,40 @@ namespace ITM_Agent.ucPanel
 
             try
             {
-                // 파일 잠김 해제 확인을 위해 읽기 시도
-                using (var stream = File.Open(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                if (File.Exists(newFilePath))
                 {
-                    // 테스트 용도로만 열고 바로 닫습니다.
+                    if (settingsManager.IsDebugMode)
+                    {
+                        logManager.LogDebug($"[ucOverrideNamesPanel] .info 파일이 이미 존재하여 생성을 건너뜁니다: {newFilePath}");
+                    }
+                    return newFilePath;
                 }
-
-                // 빈 .info 파일 생성
+                
                 using (File.Create(newFilePath)) { }
 
-                // 성공 시 경로 반환
                 return newFilePath;
             }
-            catch (IOException ioEx) when (ioEx.Message.Contains("다른 프로세스에서 사용 중"))
+            catch (IOException)
             {
-                if (settingsManager.IsDebugMode)
+                // IOException 발생 시, 잠시 대기 후 파일이 생성되었는지 확인
+                Thread.Sleep(250);
+                if (File.Exists(newFilePath))
                 {
-                    // 잠금 충돌은 Debug 레벨로만 기록
-                    logManager.LogDebug($"[ucOverrideNamesPanel] 잠금 충돌: {System.IO.Path.GetFileName(filePath)} - 재시도 예정.");
+                    // 파일이 존재하면, 다른 스레드가 성공적으로 생성한 것으로 간주하고 정상 처리
+                    logManager.LogEvent($"[ucOverrideNamesPanel] .info 파일 생성 중 일시적 잠금 발생했으나, 최종 생성 확인됨: {newFilePath}");
+                    return newFilePath;
                 }
-                return null;
+                else
+                {
+                    // 잠시 대기 후에도 파일이 없으면 실제 오류로 보고
+                    logManager.LogError($"[ucOverrideNamesPanel] .info 파일 생성 실패 (재확인 후에도 파일 없음): {newFilePath}\n대상 파일: {filePath}");
+                    return null;
+                }
             }
             catch (Exception ex)
             {
                 // 이 외의 진짜 실패는 Error 레벨로 기록
-                logManager.LogError($"[ucOverrideNamesPanel] .info 파일 생성 실패: {ex.Message}\n대상 파일: {filePath}");
+                logManager.LogError($"[ucOverrideNamesPanel] .info 파일 생성 중 예기치 않은 오류 발생: {ex.Message}\n대상 파일: {filePath}");
                 return null;
             }
         }
@@ -751,11 +755,14 @@ namespace ITM_Agent.ucPanel
 
         private string ProcessTargetFile(string targetFile, Dictionary<string, (string TimeInfo, string Prefix, string CInfo)> baselineData)
         {
-            // 파일이 준비될 때까지 대기
-            if (!WaitForFileReady(targetFile, maxRetries: 5, delayMilliseconds: 200))
+            // ▼▼▼ [수정] 파일 이름 변경(File.Move)에 대한 재시도 로직 강화 ▼▼▼
+            if (!WaitForFileReady(targetFile, maxRetries: 10, delayMilliseconds: 300))
+            {
+                logManager.LogDebug($"[ucOverrideNamesPanel] ProcessTargetFile - 파일이 준비되지 않아 건너뜁니다: {targetFile}");
                 return null;
+            }
 
-            string fileName = System.IO.Path.GetFileName(targetFile);
+            string fileName = Path.GetFileName(targetFile);
 
             foreach (var data in baselineData.Values)
             {
@@ -763,43 +770,44 @@ namespace ITM_Agent.ucPanel
                 {
                     string newName = Regex.Replace(fileName, @"_#1_", $"_{data.CInfo}_");
                     if (newName.Equals(fileName, StringComparison.Ordinal))
-                        return null;  // 이미 변경된 상태
-                    string newPath = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(targetFile), newName);
+                        return null;
 
-                    try
+                    string newPath = Path.Combine(Path.GetDirectoryName(targetFile), newName);
+                    
+                    const int maxRetries = 10;
+                    for (int i = 0; i < maxRetries; i++)
                     {
-                        File.Move(targetFile, newPath);
-                        logManager.LogEvent($"[ucOverrideNamesPanel] 파일 이름 변경: {fileName} -> {newName}");
-                        return newPath;
-                    }
-                    catch (FileNotFoundException fnfEx)
-                    {
-                        // 파일이 이미 없어진 경우: 완전 실패 아님 → Debug 로그로만 기록
-                        if (settingsManager.IsDebugMode)
+                        try
                         {
-                            logManager.LogDebug($"[ucOverrideNamesPanel] 파일 이름 변경 실패(파일 없음): {fileName}. 이유: {fnfEx.Message}");
+                            if (!File.Exists(targetFile))
+                            {
+                                if (settingsManager.IsDebugMode)
+                                {
+                                    logManager.LogDebug($"[ucOverrideNamesPanel] 이동할 원본 파일이 사라졌습니다: {targetFile}");
+                                }
+                                return null;
+                            }
+
+                            File.Move(targetFile, newPath);
+                            LogFileRename(targetFile, newPath);
+                            return newPath; // 성공
                         }
-                        return null;
-                    }
-                    catch (IOException ioEx) when (ioEx.Message.Contains("사용 중"))
-                    {
-                        // 잠김 충돌: Debug 레벨로만 기록
-                        if (settingsManager.IsDebugMode)
+                        catch (IOException) when (i < maxRetries - 1)
                         {
-                            logManager.LogDebug($"[ucOverrideNamesPanel] 잠금 충돌(File.Move): {fileName} - 재시도 예정. ({ioEx.Message})");
+                            if (settingsManager.IsDebugMode)
+                            {
+                                logManager.LogDebug($"[ucOverrideNamesPanel] 파일 이동 잠금 충돌, 재시도 ({i + 1}/{maxRetries}): {fileName}");
+                            }
+                            Thread.Sleep(500);
                         }
-                        return null;
-                    }
-                    catch (Exception ex)
-                    {
-                        // 이외의 진짜 실패 케이스만 Error 레벨로 기록
-                        logManager.LogError($"[ucOverrideNamesPanel] 파일 이름 변경 실패: {fileName}. 이유: {ex.Message}");
-                        return null;
+                        catch (Exception ex)
+                        {
+                            logManager.LogError($"[ucOverrideNamesPanel] 파일 이름 변경 실패: {fileName}. 이유: {ex.Message}");
+                            return null;
+                        }
                     }
                 }
             }
-
-            // 패턴 불일치로 처리 대상이 아니면 null
             return null;
         }
 
