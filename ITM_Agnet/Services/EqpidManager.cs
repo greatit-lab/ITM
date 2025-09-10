@@ -1,11 +1,13 @@
-// ITM_Agent\Services\EqpidManager.cs
-using System;
-using System.Collections.Concurrent; // ★ ConcurrentDictionary 사용
-using System.Windows.Forms;
-using Npgsql;
+// ITM_Agent/Services/EqpidManager.cs
 using ConnectInfo;
+using Npgsql;
+using System;
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Management;
+using System.Net;
+using System.Net.Sockets;
+using System.Windows.Forms;
 
 namespace ITM_Agent.Services
 {
@@ -132,8 +134,8 @@ namespace ITM_Agent.Services
             string machineName = SystemInfoCollector.GetMachineName();
             string locale = SystemInfoCollector.GetLocale();
             string timeZone = SystemInfoCollector.GetTimeZoneId();
-            //string pcNow = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-            DateTime pcNow = DateTime.Now;    // 그대로 DateTime
+            string ipAddress = SystemInfoCollector.GetIpAddress();
+            DateTime pcNow = DateTime.Now;
 
             try
             {
@@ -164,9 +166,9 @@ namespace ITM_Agent.Services
                     /* 3) INSERT … ON CONFLICT → UPSERT */
                     const string INSERT_SQL = @"
                         INSERT INTO public.agent_info
-                        (eqpid, type, os, system_type, pc_name, locale, timezone, app_ver, reg_date, servtime)
+                        (eqpid, type, os, system_type, pc_name, locale, timezone, app_ver, reg_date, servtime, ip_address)
                         VALUES
-                        (@eqpid, @type, @os, @arch, @pc_name, @loc, @tz, @app_ver, @pc_now::timestamp(0), NOW()::timestamp(0))
+                        (@eqpid, @type, @os, @arch, @pc_name, @loc, @tz, @app_ver, @pc_now::timestamp(0), NOW()::timestamp(0), @ip_address)
                         ON CONFLICT (eqpid, pc_name)
                         DO UPDATE SET
                             type = EXCLUDED.type,
@@ -176,7 +178,8 @@ namespace ITM_Agent.Services
                             timezone = EXCLUDED.timezone,
                             app_ver = EXCLUDED.app_ver,
                             reg_date = EXCLUDED.reg_date,
-                            servtime = NOW();";
+                            servtime = NOW(),
+                            ip_address = EXCLUDED.ip_address;";
 
                     using (var insCmd = new NpgsqlCommand(INSERT_SQL, conn))
                     {
@@ -188,8 +191,9 @@ namespace ITM_Agent.Services
                         insCmd.Parameters.AddWithValue("@loc", locale);
                         insCmd.Parameters.AddWithValue("@tz", timeZone);
                         insCmd.Parameters.AddWithValue("@app_ver", appVersion);
-                        //insCmd.Parameters.AddWithValue("@pc_now", pcNow);
                         insCmd.Parameters.Add("@pc_now", NpgsqlTypes.NpgsqlDbType.Timestamp).Value = pcNow;
+                        insCmd.Parameters.AddWithValue("@ip_address", ipAddress);
+
 
                         int rows = insCmd.ExecuteNonQuery();
                         logManager.LogEvent($"[EqpidManager] DB 업로드 완료. (rows inserted/updated={rows})");
@@ -236,5 +240,31 @@ namespace ITM_Agent.Services
 
         // ★ 수정: TimeZone의 StandardName 대신 ID를 반환하도록 수정
         public static string GetTimeZoneId() => TimeZoneInfo.Local.Id;
+
+        /// <summary>
+        /// 로컬 PC의 IPv4 주소를 반환합니다.
+        /// </summary>
+        public static string GetIpAddress()
+        {
+            try
+            {
+                // 로컬 호스트의 모든 IP 주소 목록을 가져옵니다.
+                var host = Dns.GetHostEntry(Dns.GetHostName());
+                
+                // IPv4 주소만 필터링하여 첫 번째 주소를 반환합니다.
+                foreach (var ip in host.AddressList)
+                {
+                    if (ip.AddressFamily == AddressFamily.InterNetwork)
+                    {
+                        return ip.ToString();
+                    }
+                }
+                return "Not found"; // IPv4 주소가 없는 경우
+            }
+            catch (Exception)
+            {
+                return "N/A"; // 오류 발생 시
+            }
+        }
     }
 }
