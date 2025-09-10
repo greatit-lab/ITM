@@ -46,8 +46,11 @@ namespace Onto_WaferMapHttpLib
 
     public class Onto_WaferMapHttp : IOnto_WaferMapHttp
     {
-        // HttpClient는 애플리케이션 전체에서 하나만 생성하여 재사용하는 것이 가장 효율적입니다.
-        private static readonly HttpClient httpClient = new HttpClient();
+        // ▼▼▼ [수정] HttpClient 타임아웃 기본값을 5분으로 설정 ▼▼▼
+        private static readonly HttpClient httpClient = new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(300) 
+        };
         
         // ★★★ 직접 만드신 API 서버의 주소를 여기에 입력하세요! ★★★
         private const string ApiBaseUrl = "http://192.168.0.10:8080"; // 예: http://서버IP:포트
@@ -87,7 +90,7 @@ namespace Onto_WaferMapHttpLib
                     SimpleLogger.Error($"SDWT not found for eqpid '{eqpid}'. Aborting upload.");
                     return;
                 }
-                
+
                 // 3. 파일과 함께 sdwt, eqpid를 업로드합니다.
                 string referenceAddress = UploadFileAsync(filePath, sdwt, eqpid).GetAwaiter().GetResult();
 
@@ -96,7 +99,7 @@ namespace Onto_WaferMapHttpLib
                     // 4. API 서버의 기본 주소와 참조 주소를 조합하여 완전한 URL을 만듭니다.
                     //    API가 반환하는 주소가 /로 시작하므로 그대로 붙입니다.
                     string fullUri = ApiBaseUrl + referenceAddress;
-                    
+
                     // 5. DB에 완전한 URL을 저장하고 원본 파일을 삭제합니다.
                     InsertToDatabase(filePath, eqpid, fullUri);
                     TryDeleteLocalFile(filePath);
@@ -114,8 +117,8 @@ namespace Onto_WaferMapHttpLib
         {
             try
             {
-                // 타임아웃을 5초로 설정하여 응답이 없을 때 오래 기다리지 않도록 합니다.
-                using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5)))
+                // 타임아웃을 10초로 설정하여 응답이 없을 때 오래 기다리지 않도록 합니다.
+                using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10)))
                 {
                     var response = await httpClient.GetAsync($"{ApiBaseUrl}/api/FileUpload/health", cts.Token);
                     if (response.IsSuccessStatusCode)
@@ -148,7 +151,7 @@ namespace Onto_WaferMapHttpLib
                     content.Add(new StreamContent(fileStream), "file", Path.GetFileName(filePath));
                     content.Add(new StringContent(sdwt), "sdwt");
                     content.Add(new StringContent(eqpid), "eqpid");
-                    
+
                     // API 서버의 업로드 주소로 POST 요청을 보냅니다.
                     var response = await httpClient.PostAsync($"{ApiBaseUrl}/api/FileUpload/upload", content);
 
@@ -197,6 +200,7 @@ namespace Onto_WaferMapHttpLib
                 using (var cmd = new NpgsqlCommand(sql, conn))
                 {
                     DateTime serv_kst = TimeSyncProvider.Instance.ToSynchronizedKst(fileDateTime);
+                    serv_kst = new DateTime(serv_kst.Year, serv_kst.Month, serv_kst.Day, serv_kst.Hour, serv_kst.Minute, serv_kst.Second);
 
                     cmd.Parameters.AddWithValue("@eqpid", eqpid);
                     cmd.Parameters.AddWithValue("@datetime", fileDateTime);
