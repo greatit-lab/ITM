@@ -49,9 +49,9 @@ namespace Onto_WaferMapHttpLib
         // ▼▼▼ [수정] HttpClient 타임아웃 기본값을 5분으로 설정 ▼▼▼
         private static readonly HttpClient httpClient = new HttpClient
         {
-            Timeout = TimeSpan.FromSeconds(300) 
+            Timeout = TimeSpan.FromSeconds(300)
         };
-        
+
         // ★★★ 직접 만드신 API 서버의 주소를 여기에 입력하세요! ★★★
         private const string ApiBaseUrl = "http://192.168.0.10:8080"; // 예: http://서버IP:포트
 
