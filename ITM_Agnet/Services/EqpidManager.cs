@@ -194,7 +194,6 @@ namespace ITM_Agent.Services
                         insCmd.Parameters.Add("@pc_now", NpgsqlTypes.NpgsqlDbType.Timestamp).Value = pcNow;
                         insCmd.Parameters.AddWithValue("@ip_address", ipAddress);
 
-
                         int rows = insCmd.ExecuteNonQuery();
                         logManager.LogEvent($"[EqpidManager] DB 업로드 완료. (rows inserted/updated={rows})");
                     }
@@ -250,7 +249,7 @@ namespace ITM_Agent.Services
             {
                 // 로컬 호스트의 모든 IP 주소 목록을 가져옵니다.
                 var host = Dns.GetHostEntry(Dns.GetHostName());
-                
+
                 // IPv4 주소만 필터링하여 첫 번째 주소를 반환합니다.
                 foreach (var ip in host.AddressList)
                 {
