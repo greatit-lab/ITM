@@ -29,8 +29,7 @@ namespace ITM_Agent.Services
             this.logManager = logManager ?? throw new ArgumentNullException(nameof(logManager));
             this.appVersion = appVersion ?? throw new ArgumentNullException(nameof(appVersion));
         }
-        
-        // ... (GetTimezoneForEqpid, InitializeEqpid, PromptForEqpid, UploadAgentInfoToDatabase, CheckForChanges 메서드는 변경 없음) ...
+
         public TimeZoneInfo GetTimezoneForEqpid(string eqpid)
         {
             if (timezoneCache.TryGetValue(eqpid, out TimeZoneInfo cachedZone))
@@ -255,7 +254,7 @@ namespace ITM_Agent.Services
             return false;
         }
     }
-    
+
     public static class SystemInfoCollector
     {
         private static ManagementObjectCollection GetWmiQueryResult(string wmiClass, string property)
@@ -267,7 +266,7 @@ namespace ITM_Agent.Services
             }
             catch { return null; }
         }
-        
+
         public static string GetOsArchitecture() => Environment.Is64BitOperatingSystem ? "64-bit" : "32-bit";
 
         public static string GetFormattedCpuInfo()
@@ -281,15 +280,15 @@ namespace ITM_Agent.Services
                 cpuName = Regex.Replace(cpuName, @"\(R\)|\(TM\)|CPU|Processor|Gen", "").Trim();
                 cpuName = Regex.Replace(cpuName, @"\s+", " ");
                 var match = Regex.Match(cpuName, @"(Intel Core i\d-\d+\w*|AMD Ryzen \d \d+\w*)\s*@\s*(\d\.\d+\wHz)");
-                if(match.Success)
+                if (match.Success)
                 {
-                    return $"{match.Groups[1].Value.Replace("Core ","")} {match.Groups[2].Value}";
+                    return $"{match.Groups[1].Value.Replace("Core ", "")} {match.Groups[2].Value}";
                 }
                 return cpuName;
             }
             catch { return "N/A"; }
         }
-        
+
         // ▼▼▼ [핵심 수정] 메모리 정보 조회 로직 안정성 강화 ▼▼▼
         public static string GetFormattedMemoryInfo()
         {
@@ -304,11 +303,11 @@ namespace ITM_Agent.Services
                 }
                 else // 2순위: Win32_ComputerSystem (Byte 단위)
                 {
-                     var cs = GetWmiQueryResult("Win32_ComputerSystem", "TotalPhysicalMemory")?.Cast<ManagementObject>().FirstOrDefault();
-                     if (cs != null && cs["TotalPhysicalMemory"] != null)
-                     {
-                         totalMemoryGB = Math.Round(Convert.ToDouble(cs["TotalPhysicalMemory"]) / (1024 * 1024 * 1024));
-                     }
+                    var cs = GetWmiQueryResult("Win32_ComputerSystem", "TotalPhysicalMemory")?.Cast<ManagementObject>().FirstOrDefault();
+                    if (cs != null && cs["TotalPhysicalMemory"] != null)
+                    {
+                        totalMemoryGB = Math.Round(Convert.ToDouble(cs["TotalPhysicalMemory"]) / (1024 * 1024 * 1024));
+                    }
                 }
 
                 if (totalMemoryGB <= 0) return "N/A";
@@ -331,7 +330,7 @@ namespace ITM_Agent.Services
                         }
                     }
                 }
-                
+
                 return (memoryType != "Unknown") ? $"{memoryType} {totalMemoryGB}GB" : $"{totalMemoryGB}GB";
             }
             catch { return "N/A"; }
@@ -341,21 +340,28 @@ namespace ITM_Agent.Services
         {
             switch (Convert.ToInt32(typeCode))
             {
-                case 20: return "DDR"; case 21: return "DDR2"; case 22: return "FBDIMM";
-                case 24: return "DDR3"; case 26: case 30: return "DDR4";
-                case 34: return "DDR5"; default: return "Unknown";
+                case 20: return "DDR";
+                case 21: return "DDR2";
+                case 22: return "FBDIMM";
+                case 24: return "DDR3";
+                case 26: case 30: return "DDR4";
+                case 34: return "DDR5";
+                default: return "Unknown";
             }
         }
-        
+
         private static string GetMemoryTypeFromGeneral(string typeCode)
         {
             switch (Convert.ToInt32(typeCode))
             {
-                case 17: return "DDR"; case 18: return "DDR2"; case 24: return "DDR3";
-                case 26: return "DDR4"; case 0: default: return "Unknown";
+                case 17: return "DDR";
+                case 18: return "DDR2";
+                case 24: return "DDR3";
+                case 26: return "DDR4";
+                case 0: default: return "Unknown";
             }
         }
-        
+
         public static string GetFormattedDiskInfo()
         {
             try
@@ -367,7 +373,7 @@ namespace ITM_Agent.Services
                 {
                     var deviceID = logicalDisk["DeviceID"]?.ToString();
                     if (deviceID == null) continue;
-                    
+
                     var totalSizeBytes = Convert.ToUInt64(logicalDisk["Size"]);
                     var totalSizeGB = Math.Round((double)totalSizeBytes / (1024 * 1024 * 1024), 2);
 
@@ -377,7 +383,7 @@ namespace ITM_Agent.Services
             }
             catch { return "N/A"; }
         }
-        
+
         public static string GetFormattedVgaInfo()
         {
             try
@@ -404,8 +410,8 @@ namespace ITM_Agent.Services
 
                 if (!vgaList.Any()) return "N/A";
 
-                var discreteGpu = vgaList.FirstOrDefault(vga => 
-                    vga.Item1.IndexOf("NVIDIA", StringComparison.OrdinalIgnoreCase) >= 0 || 
+                var discreteGpu = vgaList.FirstOrDefault(vga =>
+                    vga.Item1.IndexOf("NVIDIA", StringComparison.OrdinalIgnoreCase) >= 0 ||
                     vga.Item1.IndexOf("AMD", StringComparison.OrdinalIgnoreCase) >= 0);
 
                 if (discreteGpu != null)
@@ -418,12 +424,12 @@ namespace ITM_Agent.Services
             }
             catch { return "N/A"; }
         }
-        
+
         public static string GetOSVersion() => GetWmiQueryResult("Win32_OperatingSystem", "Caption")?.Cast<ManagementObject>().FirstOrDefault()?["Caption"]?.ToString().Trim() ?? "N/A";
         public static string GetMachineName() => Environment.MachineName;
         public static string GetLocale() => CultureInfo.CurrentUICulture.Name;
         public static string GetTimeZoneId() => TimeZoneInfo.Local.Id;
-        
+
         private static (string IpAddress, string MacAddress) GetPrimaryNetworkInfo()
         {
             try
@@ -441,20 +447,20 @@ namespace ITM_Agent.Services
                     var ipv4Address = ipProps.UnicastAddresses
                         .FirstOrDefault(addr => addr.Address.AddressFamily == AddressFamily.InterNetwork)?
                         .Address.ToString();
-                    
+
                     var macAddress = primaryInterface.GetPhysicalAddress()?.ToString();
                     return (ipv4Address ?? "Not found", macAddress ?? "N/A");
                 }
             }
             catch { /* Fallback */ }
-            
+
             var fallbackIp = Dns.GetHostEntry(Dns.GetHostName()).AddressList
                 .FirstOrDefault(ip => ip.AddressFamily == AddressFamily.InterNetwork)?.ToString() ?? "Not found";
-            
+
             var fallbackMac = NetworkInterface.GetAllNetworkInterfaces()
                 .FirstOrDefault(ni => ni.NetworkInterfaceType == NetworkInterfaceType.Ethernet && ni.OperationalStatus == OperationalStatus.Up)
                 ?.GetPhysicalAddress().ToString() ?? "N/A";
-                
+
             return (fallbackIp, fallbackMac);
         }
 
