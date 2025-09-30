@@ -13,7 +13,7 @@ namespace ITM_Agent.Services
     {
         private static readonly Lazy<PerformanceMonitor> _inst = new Lazy<PerformanceMonitor>(() => new PerformanceMonitor());
         public static PerformanceMonitor Instance => _inst.Value;
-        
+
         private const long MAX_LOG_SIZE = 5 * 1024 * 1024;
         private readonly HardwareSampler sampler;
         private readonly CircularBuffer<Metric> buffer = new CircularBuffer<Metric>(capacity: 1000);
@@ -66,7 +66,7 @@ namespace ITM_Agent.Services
         {
             sampler.OnSample -= consumer;
         }
-        
+
         private PerformanceMonitor()
         {
             sampler = new HardwareSampler(intervalMs: 5_000);
@@ -188,7 +188,7 @@ namespace ITM_Agent.Services
         public IEnumerable<T> ToArray() => Enumerable.Range(0, count).Select(i => buf[(head + i) % Capacity]);
         public void Clear() => head = count = 0;
     }
-    
+
     internal sealed class HardwareSampler
     {
         public event Action<Metric> OnSample;
@@ -234,7 +234,7 @@ namespace ITM_Agent.Services
                 logManager.LogError($"[HardwareSampler] Failed to open LibreHardwareMonitor: {ex.Message}");
             }
         }
-        
+
         private bool IsRunningAsAdmin()
         {
             using (var identity = WindowsIdentity.GetCurrent())
@@ -267,7 +267,7 @@ namespace ITM_Agent.Services
                 {
                     hardware.Update();
                 }
-                
+
                 var cpu = computer.Hardware.FirstOrDefault(h => h.HardwareType == HardwareType.Cpu);
                 if (cpu != null)
                 {
@@ -275,7 +275,7 @@ namespace ITM_Agent.Services
                     cpuTemp = cpu.Sensors.FirstOrDefault(s => s.SensorType == SensorType.Temperature && s.Name.Contains("Package"))?.Value ??
                               cpu.Sensors.FirstOrDefault(s => s.SensorType == SensorType.Temperature && s.Name.Contains("Core"))?.Value ?? 0;
                 }
-                
+
                 var memory = computer.Hardware.FirstOrDefault(h => h.HardwareType == HardwareType.Memory);
                 if (memory != null)
                 {
@@ -301,7 +301,7 @@ namespace ITM_Agent.Services
                 {
                     gpuTemp = gpu.Sensors.FirstOrDefault(s => s.SensorType == SensorType.Temperature && s.Name.Contains("Core"))?.Value ?? 0;
                 }
-                
+
                 var allSensors = computer.Hardware.SelectMany(h => h.Sensors.Concat(h.SubHardware.SelectMany(sh => sh.Sensors)));
                 fanRpm = (int)(allSensors.FirstOrDefault(s => s.SensorType == SensorType.Fan && s.Name.Contains("CPU"))?.Value ??
                                allSensors.FirstOrDefault(s => s.SensorType == SensorType.Fan)?.Value ?? 0);
