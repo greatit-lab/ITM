@@ -110,7 +110,7 @@ namespace ITM_Agent.Services
 
                             float cpuUsage = (float)Math.Round(m.Cpu, 2);
                             if (cpuUsage == 0.0f && m.Cpu > 0.0f) cpuUsage = 0.01f;
-                            
+
                             pCpu.Value = cpuUsage;
                             pMem.Value = Math.Round(m.Mem, 2);
                             // ▼▼▼ [핵심 수정] 새로운 파라미터에 값 할당 ▼▼▼
