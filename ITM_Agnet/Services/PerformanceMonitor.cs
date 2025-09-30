@@ -1,42 +1,30 @@
-// ITM_Agent\Services\PerformanceMonitor.cs
+// ITM_Agent/Services/PerformanceMonitor.cs
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Management;          // [추가] 총 메모리 조회용 WMI
 using System.Threading;
+using LibreHardwareMonitor.Hardware;
+using System.Security.Principal;
 
 namespace ITM_Agent.Services
 {
-    /// <summary>
-    /// CPU·메모리 사용률을 5 초(기본) / 1 초(과부하) 간격으로 수집하여
-    /// CircularBuffer 에 저장 후 60 건 또는 30 초마다
-    /// Logs\yyyyMMdd_performance.log 로 배치 기록하는 싱글턴 서비스
-    /// </summary>
     public sealed class PerformanceMonitor
     {
-        /* ───────────── 싱글턴 ───────────── */
-        private static readonly Lazy<PerformanceMonitor> _inst =
-            new Lazy<PerformanceMonitor>(() => new PerformanceMonitor());
+        private static readonly Lazy<PerformanceMonitor> _inst = new Lazy<PerformanceMonitor>(() => new PerformanceMonitor());
         public static PerformanceMonitor Instance => _inst.Value;
-
-        /* ───────────── 내부 필드 ───────────── */
-        private const long MAX_LOG_SIZE = 5 * 1024 * 1024;   // 5 MB  // [추가]
-        private readonly PdhSampler sampler;
-        private readonly CircularBuffer<Metric> buffer =
-            new CircularBuffer<Metric>(capacity: 1000);
+        
+        private const long MAX_LOG_SIZE = 5 * 1024 * 1024;
+        private readonly HardwareSampler sampler;
+        private readonly CircularBuffer<Metric> buffer = new CircularBuffer<Metric>(capacity: 1000);
         private readonly Timer flushTimer;
         private readonly object sync = new object();
-
-        private const int FLUSH_INTERVAL_MS = 30_000;   // 30 초마다 배치 쓰기
-        private const int BULK_COUNT = 60;       // 60건 이상 시 즉시 쓰기
+        private const int FLUSH_INTERVAL_MS = 30_000;
+        private const int BULK_COUNT = 60;
         private bool isEnabled;
+        private bool sampling;
+        private bool fileLoggingEnabled;
 
-        private bool sampling;                 // 샘플러 실행 여부
-        private bool fileLoggingEnabled;       // [추가] 파일 기록 여부
-
-        /*──────── 샘플링 ON ───────*/
         internal void StartSampling()
         {
             if (sampling) return;
@@ -44,7 +32,6 @@ namespace ITM_Agent.Services
             sampler.Start();
         }
 
-        /*──────── 샘플링 + 파일로깅 OFF ──*/
         internal void StopSampling()
         {
             if (!sampling) return;
@@ -53,11 +40,7 @@ namespace ITM_Agent.Services
             sampling = false;
         }
 
-        /*──────── 파일 로깅 ON/OFF API ──*/
-        internal void SetFileLogging(bool enable) =>
-            (enable ? (Action)EnableFileLogging : DisableFileLogging)();
-
-        /*──────── 내부 구현 ─────────*/
+        internal void SetFileLogging(bool enable) => (enable ? (Action)EnableFileLogging : DisableFileLogging)();
         private void EnableFileLogging()
         {
             if (fileLoggingEnabled) return;
@@ -70,12 +53,10 @@ namespace ITM_Agent.Services
         {
             if (!fileLoggingEnabled) return;
             flushTimer.Change(Timeout.Infinite, Timeout.Infinite);
-            FlushToFile();                       // 남은 버퍼 기록 후 off
+            FlushToFile();
             fileLoggingEnabled = false;
         }
 
-        //──────────────── Consumers Registration ────────────────
-        // 외부(Batch Writer 등)가 Metric 샘플을 구독/해제할 수 있는 공개 메서드
         internal void RegisterConsumer(Action<Metric> consumer)
         {
             sampler.OnSample += consumer;
@@ -85,29 +66,22 @@ namespace ITM_Agent.Services
         {
             sampler.OnSample -= consumer;
         }
-
-        /* ───────────── ctor ───────────── */
+        
         private PerformanceMonitor()
         {
-            sampler = new PdhSampler(intervalMs: 5_000);          // 기본 5 초
+            sampler = new HardwareSampler(intervalMs: 5_000);
             sampler.OnSample += OnSampleReceived;
             sampler.OnThresholdExceeded += () => sampler.IntervalMs = 1_000;
             sampler.OnBackToNormal += () => sampler.IntervalMs = 5_000;
-
-            flushTimer = new Timer(_ => FlushToFile(),
-                                   null,
-                                   Timeout.Infinite,
-                                   Timeout.Infinite);
+            flushTimer = new Timer(_ => FlushToFile(), null, Timeout.Infinite, Timeout.Infinite);
         }
 
-        /* ───────────── Public API ───────────── */
         public void Start()
         {
             lock (sync)
             {
                 if (isEnabled) return;
                 isEnabled = true;
-
                 Directory.CreateDirectory(GetLogDir());
                 sampler.Start();
                 flushTimer.Change(FLUSH_INTERVAL_MS, FLUSH_INTERVAL_MS);
@@ -120,14 +94,12 @@ namespace ITM_Agent.Services
             {
                 if (!isEnabled) return;
                 isEnabled = false;
-
                 sampler.Stop();
                 flushTimer.Change(Timeout.Infinite, Timeout.Infinite);
-                FlushToFile();                                 // 종료 시 잔여 버퍼 기록
+                FlushToFile();
             }
         }
 
-        /* ───────────── 내부 콜백 ───────────── */
         private void OnSampleReceived(Metric m)
         {
             lock (sync)
@@ -141,182 +113,217 @@ namespace ITM_Agent.Services
         private void FlushToFile()
         {
             if (!fileLoggingEnabled || buffer.Count == 0) return;
-
             string fileName = $"{DateTime.Now:yyyyMMdd}_performance.log";
             string filePath = Path.Combine(GetLogDir(), fileName);
-
-            /*── ① 5 MB 초과 시 회전 ───────────────────────────────────────────────*/
-            RotatePerfLogIfNeeded(filePath);    // [추가]
-
-            /*── ② 실제 쓰기 ────────────────────────────────────────────────────*/
-            using (var fs = new FileStream(filePath, FileMode.OpenOrCreate,
-                                           FileAccess.Write, FileShare.ReadWrite))
+            RotatePerfLogIfNeeded(filePath);
+            using (var fs = new FileStream(filePath, FileMode.OpenOrCreate, FileAccess.Write, FileShare.ReadWrite))
             {
-                fs.Seek(0, SeekOrigin.End);                      // 항상 Append
+                fs.Seek(0, SeekOrigin.End);
                 using (var sw = new StreamWriter(fs))
                 {
                     foreach (Metric m in buffer.ToArray())
                     {
-                        DateTime local = m.Timestamp;            // 이미 PC 로컬 시각
-                        sw.WriteLine($"{local:yyyy-MM-dd HH:mm:ss.fff} " +
-                                     $"C:{m.Cpu:F2} M:{m.Mem:F2}");
+                        sw.WriteLine($"{m.Timestamp:yyyy-MM-dd HH:mm:ss.fff} C:{m.Cpu:F2} M:{m.Mem:F2} CT:{m.CpuTemp:F1} GT:{m.GpuTemp:F1} FAN:{m.FanRpm}");
                     }
                 }
             }
             buffer.Clear();
         }
 
-        /*===================  (신규) 5 MB 초과 로테이션 메서드 ===================*/
-        private void RotatePerfLogIfNeeded(string filePath)      // [추가]
+        private void RotatePerfLogIfNeeded(string filePath)
         {
             var fi = new FileInfo(filePath);
-            if (!fi.Exists || fi.Length <= MAX_LOG_SIZE) return;  // 5 MB 이하 → 그대로
-
-            string extension = fi.Extension;                          // ".log"
-            string baseName = Path.GetFileNameWithoutExtension(filePath); // "20250728_performance"
+            if (!fi.Exists || fi.Length <= MAX_LOG_SIZE) return;
+            string extension = fi.Extension;
+            string baseName = Path.GetFileNameWithoutExtension(filePath);
             string dir = fi.DirectoryName;
-
             int index = 1;
             string rotatedPath;
             do
             {
-                string rotatedName = $"{baseName}_{index}{extension}"; // ex) 20250728_performance_3.log
+                string rotatedName = $"{baseName}_{index}{extension}";
                 rotatedPath = Path.Combine(dir, rotatedName);
                 index++;
             }
-            while (File.Exists(rotatedPath));                          // 중복 방지
-
-            File.Move(filePath, rotatedPath);                          // 회전 완료
+            while (File.Exists(rotatedPath));
+            File.Move(filePath, rotatedPath);
         }
 
-        private static string GetLogDir() =>
-            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Logs");
+        private static string GetLogDir() => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Logs");
     }
 
-    /*────────────────────────── Metric ──────────────────────────*/
     internal readonly struct Metric
     {
-        public DateTime Timestamp { get; }   // 장비 로컬 시각
+        public DateTime Timestamp { get; }
         public float Cpu { get; }
         public float Mem { get; }
+        public float CpuTemp { get; }
+        public float GpuTemp { get; }
+        public int FanRpm { get; }
 
-        public Metric(float cpu, float mem)
+        public Metric(float cpu, float mem, float cpuTemp, float gpuTemp, int fanRpm)
         {
-            Timestamp = DateTime.Now;         // [수정] 장비(PC) 현재 시각 그대로
+            Timestamp = DateTime.Now;
             Cpu = cpu;
             Mem = mem;
+            CpuTemp = cpuTemp;
+            GpuTemp = gpuTemp;
+            FanRpm = fanRpm;
         }
     }
 
-    /*────────────────────── CircularBuffer<T> ───────────────────*/
     internal sealed class CircularBuffer<T>
     {
         private readonly T[] buf;
         private int head, count;
         public int Capacity { get; }
         public int Count => count;
-
-        public CircularBuffer(int capacity)
-        {
-            Capacity = capacity;
-            buf = new T[capacity];
-        }
-
+        public CircularBuffer(int capacity) { Capacity = capacity; buf = new T[capacity]; }
         public void Push(T item)
         {
             buf[(head + count) % Capacity] = item;
-            if (count == Capacity)
-                head = (head + 1) % Capacity;    // overwrite
-            else
-                count++;
+            if (count == Capacity) head = (head + 1) % Capacity;
+            else count++;
         }
-
-        public IEnumerable<T> ToArray() =>
-            Enumerable.Range(0, count)
-                      .Select(i => buf[(head + i) % Capacity]);
-
+        public IEnumerable<T> ToArray() => Enumerable.Range(0, count).Select(i => buf[(head + i) % Capacity]);
         public void Clear() => head = count = 0;
     }
-
-    /*──────────────────────── PdhSampler ────────────────────────*/
-    /// <summary>
-    /// PDH(PerfCounter) 기반 경량 샘플러 + 임계치 감시
-    /// </summary>
-    internal sealed class PdhSampler
+    
+    internal sealed class HardwareSampler
     {
         public event Action<Metric> OnSample;
         public event Action OnThresholdExceeded;
         public event Action OnBackToNormal;
 
-        private readonly PerformanceCounter cpuCounter =
-            new PerformanceCounter("Processor", "% Processor Time", "_Total");
-        private readonly PerformanceCounter memFreeMbCounter =
-            new PerformanceCounter("Memory", "Available MBytes");
-
-        private readonly float totalMemMb;            // [추가] WMI 1회 조회
+        private readonly Computer computer;
         private Timer timer;
         private int interval;
         private bool overload;
+        private readonly LogManager logManager;
 
         public int IntervalMs
         {
             get => interval;
-            set
-            {
-                interval = Math.Max(500, value);      // 최소 0.5 초
-                timer?.Change(0, interval);
-            }
+            set { interval = Math.Max(500, value); timer?.Change(0, interval); }
         }
 
-        public PdhSampler(int intervalMs)
+        public HardwareSampler(int intervalMs)
         {
             interval = intervalMs;
-            totalMemMb = GetTotalMemoryMb();        // [수정] Microsoft.VisualBasic 제거
+            logManager = new LogManager(AppDomain.CurrentDomain.BaseDirectory);
+            computer = new Computer
+            {
+                IsCpuEnabled = true,
+                IsGpuEnabled = true,
+                IsMemoryEnabled = true,
+                IsMotherboardEnabled = true,
+                IsStorageEnabled = true,
+                IsControllerEnabled = true
+            };
+
+            try
+            {
+                if (!IsRunningAsAdmin())
+                {
+                    logManager.LogError("[HardwareSampler] Not running with Administrator privileges. Hardware sensor data may be unavailable.");
+                }
+                computer.Open();
+            }
+            catch (Exception ex)
+            {
+                logManager.LogError($"[HardwareSampler] Failed to open LibreHardwareMonitor: {ex.Message}");
+            }
+        }
+        
+        private bool IsRunningAsAdmin()
+        {
+            using (var identity = WindowsIdentity.GetCurrent())
+            {
+                var principal = new WindowsPrincipal(identity);
+                return principal.IsInRole(WindowsBuiltInRole.Administrator);
+            }
         }
 
         public void Start() => timer = new Timer(_ => Sample(), null, 0, interval);
-        public void Stop() { timer?.Dispose(); timer = null; }
-
-        /* ───────────── 샘플링 ───────────── */
-        private void Sample()
+        public void Stop()
         {
-            float cpuVal = cpuCounter.NextValue();
-            float freeMb = memFreeMbCounter.NextValue();
-            // 1초 동안 평균 사용량을 측정하기 위해 대기 시간을 1000ms로 변경
-            Thread.Sleep(1000);
-            cpuVal = cpuCounter.NextValue();
-
-            // totalMemMb가 0인 경우 DivideByZeroException 방지
-            float usedRatio = (totalMemMb > 0) ? ((totalMemMb - freeMb) / totalMemMb) * 100f : 0f;
-            OnSample?.Invoke(new Metric(cpuVal, usedRatio));
-
-            bool isOver = (cpuVal > 75f) || (usedRatio > 80f);
-            if (isOver && !overload)
-            {
-                overload = true;
-                OnThresholdExceeded?.Invoke();
-            }
-            else if (!isOver && overload)
-            {
-                overload = false;
-                OnBackToNormal?.Invoke();
-            }
-        }
-
-        /* ───────────── 총 메모리(WMI) ───────────── */
-        private static float GetTotalMemoryMb()
-        {
+            timer?.Dispose();
+            timer = null;
             try
             {
-                using (var searcher = new ManagementObjectSearcher(
-                       "SELECT TotalVisibleMemorySize FROM Win32_OperatingSystem"))
+                computer.Close();
+            }
+            catch { /* Ignore */ }
+        }
+
+        private void Sample()
+        {
+            float cpuUsage = 0, memUsage = 0, cpuTemp = 0, gpuTemp = 0;
+            int fanRpm = 0;
+
+            try
+            {
+                foreach (var hardware in computer.Hardware)
                 {
-                    foreach (ManagementObject o in searcher.Get())
-                        return Convert.ToSingle(o["TotalVisibleMemorySize"]) / 1024f;
+                    hardware.Update();
+                }
+                
+                var cpu = computer.Hardware.FirstOrDefault(h => h.HardwareType == HardwareType.Cpu);
+                if (cpu != null)
+                {
+                    cpuUsage = cpu.Sensors.FirstOrDefault(s => s.SensorType == SensorType.Load && s.Name == "CPU Total")?.Value ?? 0;
+                    cpuTemp = cpu.Sensors.FirstOrDefault(s => s.SensorType == SensorType.Temperature && s.Name.Contains("Package"))?.Value ??
+                              cpu.Sensors.FirstOrDefault(s => s.SensorType == SensorType.Temperature && s.Name.Contains("Core"))?.Value ?? 0;
+                }
+                
+                var memory = computer.Hardware.FirstOrDefault(h => h.HardwareType == HardwareType.Memory);
+                if (memory != null)
+                {
+                    // ▼▼▼ [핵심 수정] 메모리 사용률(%) 센서를 이름에 상관없이 직접 찾도록 수정 ▼▼▼
+                    var memoryLoad = memory.Sensors.FirstOrDefault(s => s.SensorType == SensorType.Load);
+                    if (memoryLoad?.Value != null)
+                    {
+                        memUsage = memoryLoad.Value.Value;
+                    }
+                    else // 2순위: 수동 계산
+                    {
+                        var used = memory.Sensors.FirstOrDefault(s => s.SensorType == SensorType.Data && s.Name == "Memory Used")?.Value;
+                        var total = memory.Sensors.FirstOrDefault(s => s.SensorType == SensorType.Data && s.Name == "Memory Total")?.Value;
+                        if (used.HasValue && total.HasValue && total > 0)
+                        {
+                            memUsage = (used.Value / total.Value) * 100;
+                        }
+                    }
+                }
+
+                var gpu = computer.Hardware.FirstOrDefault(h => h.HardwareType == HardwareType.GpuAmd || h.HardwareType == HardwareType.GpuNvidia);
+                if (gpu != null)
+                {
+                    gpuTemp = gpu.Sensors.FirstOrDefault(s => s.SensorType == SensorType.Temperature && s.Name.Contains("Core"))?.Value ?? 0;
+                }
+                
+                var allSensors = computer.Hardware.SelectMany(h => h.Sensors.Concat(h.SubHardware.SelectMany(sh => sh.Sensors)));
+                fanRpm = (int)(allSensors.FirstOrDefault(s => s.SensorType == SensorType.Fan && s.Name.Contains("CPU"))?.Value ??
+                               allSensors.FirstOrDefault(s => s.SensorType == SensorType.Fan)?.Value ?? 0);
+
+                OnSample?.Invoke(new Metric(cpuUsage, memUsage, cpuTemp, gpuTemp, fanRpm));
+
+                bool isOver = (cpuUsage > 75f) || (memUsage > 80f);
+                if (isOver && !overload)
+                {
+                    overload = true;
+                    OnThresholdExceeded?.Invoke();
+                }
+                else if (!isOver && overload)
+                {
+                    overload = false;
+                    OnBackToNormal?.Invoke();
                 }
             }
-            catch { /* 실패 시 0 반환 → 나눗셈 보호는 호출부에서 */ }
-            return 0f;
+            catch (Exception ex)
+            {
+                logManager.LogError($"[HardwareSampler] Failed to sample hardware info: {ex.Message}");
+            }
         }
     }
 }
