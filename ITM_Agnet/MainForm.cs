@@ -1,4 +1,4 @@
-// ITM_Agent\MainForm.cs
+// ITM_Agent/MainForm.cs
 using ITM_Agent.Services;
 using ITM_Agent.Startup;
 using ITM_Agent.ucPanel;
@@ -25,7 +25,7 @@ namespace ITM_Agent
         private ToolStripMenuItem stopItem;
         private ToolStripMenuItem quitItem;
 
-        private const string AppVersion = "v1.0.0";
+        private const string AppVersion = "v0.0.3.4";
         internal static string VersionInfo => AppVersion;   // 다른 폼에서 읽기용
 
         ucPanel.ucConfigurationPanel ucSc1;
