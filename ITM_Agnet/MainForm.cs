@@ -11,7 +11,7 @@ namespace ITM_Agent
 {
     public partial class MainForm : Form
     {
-        private bool isExiting = false;              // [추가] 중복·재귀 종료 방지
+        private bool isExiting = false;
         private SettingsManager settingsManager;
         private LogManager logManager;
         private FileWatcherManager fileWatcherManager;
@@ -26,15 +26,14 @@ namespace ITM_Agent
         private ToolStripMenuItem stopItem;
         private ToolStripMenuItem quitItem;
 
-        private const string AppVersion = "v0.0.4.0";
-        internal static string VersionInfo => AppVersion;   // 다른 폼에서 읽기용
+        private const string AppVersion = "v0.0.4.3";
+        internal static string VersionInfo => AppVersion;
 
         ucPanel.ucConfigurationPanel ucSc1;
 
         private ucConfigurationPanel ucConfigPanel;
         private ucOverrideNamesPanel ucOverrideNamesPanel;
         private ucImageTransPanel ucImageTransPanel;
-        //private ucScreen4 ucUploadDataPanel;
 
         private bool isRunning = false; // 현재 상태 플래그
         private bool isDebugMode = false;   // 디버그 모드 상태
