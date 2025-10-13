@@ -161,7 +161,7 @@ namespace ITM_Agent.Services
                 // 경로를 정규화하여 정확한 하위 폴더 여부를 비교합니다.
                 string normalizedExclude = Path.GetFullPath(excludeFolder).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
                 string normalizedChanged = Path.GetFullPath(changedFolderPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        
+
                 if (normalizedChanged.StartsWith(normalizedExclude, StringComparison.OrdinalIgnoreCase))
                 {
                     if (isDebugMode)
