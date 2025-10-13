@@ -33,12 +33,13 @@ namespace ITM_Agent.Services
         private bool _isRunning = false;
         private readonly object _lock = new object();
 
-        private const string PROCESS_NAME = "Main64";
+        private readonly string PROCESS_NAME;
 
         public LampLifeService(SettingsManager settingsManager, LogManager logManager)
         {
             _settingsManager = settingsManager;
             _logManager = logManager;
+            PROCESS_NAME = Environment.Is64BitOperatingSystem ? "Main64" : "Main";
         }
 
         public void Start()
@@ -104,50 +105,72 @@ namespace ITM_Agent.Services
 
             try
             {
-                // UI 자동화 로직 (기존 Collector.cs)
                 var app = Application.Attach(PROCESS_NAME);
                 using (var automation = new UIA3Automation())
                 {
                     var mainWindow = app.GetMainWindow(automation);
 
-                    var systemButton = mainWindow.FindFirstDescendant(cf => cf.ByAutomationId("25004"))?.AsButton();
-                    systemButton?.Click();
-                    await Task.Delay(500);
+                    // 1. "System" 버튼 찾기 및 클릭
+                    var systemButton = mainWindow.FindFirstDescendant(cf => cf.ByName("System").And(cf.ByControlType(ControlType.Button)))?.AsButton();
+                    if (systemButton == null && Environment.Is64BitOperatingSystem)
+                    {
+                        systemButton = mainWindow.FindFirstDescendant(cf => cf.ByAutomationId("25004"))?.AsButton();
+                    }
+                    if (systemButton == null) throw new Exception("UI Automation: 'System' 버튼을 찾을 수 없습니다.");
+                    systemButton.Click();
+                    await Task.Delay(1000);
 
-                    var tabControl = mainWindow.FindFirstDescendant(cf => cf.ByAutomationId("1111"))?.AsTab();
-                    var lampsTab = tabControl?.FindFirstDescendant(cf => cf.ByName("Lamps").And(cf.ByControlType(ControlType.TabItem)));
-                    lampsTab?.Click();
-                    await Task.Delay(500);
+                    // 2. "Lamps" 탭 아이템 찾기
+                    var lampsTab = mainWindow.FindFirstDescendant(cf => cf.ByName("Lamps").And(cf.ByControlType(ControlType.TabItem)))?.AsTabItem();
+                    if (lampsTab == null) throw new Exception("UI Automation: 'Lamps' 탭을 찾을 수 없습니다.");
 
-                    var lampList = mainWindow.FindFirstDescendant(cf => cf.ByAutomationId("10819").And(cf.ByControlType(ControlType.List)));
-                    var lampItems = lampList?.FindAllChildren(cf => cf.ByControlType(ControlType.ListItem));
+                    // 3. .Select() 메서드로 탭 선택
+                    lampsTab.Select();
+                    await Task.Delay(1000);
+
+                    // ▼▼▼ [핵심 수정] AutomationId "10819"를 사용하여 Lamp Status 목록을 직접 찾기 ▼▼▼
+                    var lampList = mainWindow.FindFirstDescendant(cf => cf.ByAutomationId("10819").And(cf.ByControlType(ControlType.List)))?.AsListBox();
+                    if (lampList == null) throw new Exception("UI Automation: 'Lamp Status' 목록(ID:10819)을 찾을 수 없습니다.");
+
+                    var lampItems = lampList.FindAllChildren(cf => cf.ByControlType(ControlType.ListItem));
 
                     if (lampItems != null)
                     {
                         foreach (var item in lampItems)
                         {
-                            var cells = item.FindAllChildren();
-                            var newLamp = new LampInfo
-                            {
-                                LampId = item.Name,
-                                Age = cells.FirstOrDefault(c => c.AutomationId == "ListViewSubItem-1")?.Name,
-                                LifeSpan = cells.FirstOrDefault(c => c.AutomationId == "ListViewSubItem-2")?.Name,
-                                LastChanged = cells.FirstOrDefault(c => c.AutomationId == "ListViewSubItem-4")?.Name
-                            };
+                            var cells = item.FindAllDescendants(cf => cf.ByControlType(ControlType.Text));
 
-                            if (!string.IsNullOrEmpty(newLamp.LampId))
-                                collectedLamps.Add(newLamp);
+                            // 5개의 컬럼이 모두 있는지 확인하는 로직으로 복원
+                            if (cells.Length > 4)
+                            {
+                                var newLamp = new LampInfo
+                                {
+                                    LampId = cells[0].Name,
+                                    Age = cells[1].Name,
+                                    LifeSpan = cells[2].Name,
+                                    LastChanged = cells[4].Name
+                                };
+
+                                if (!string.IsNullOrEmpty(newLamp.LampId))
+                                    collectedLamps.Add(newLamp);
+                            }
                         }
                     }
 
-                    var processingButton = mainWindow.FindFirstDescendant(cf => cf.ByAutomationId("25003"))?.AsButton();
-                    processingButton?.Click();
+                    // 5. 원래 화면으로 돌아가기 위해 "Processing" 버튼 클릭
+                    var processingButton = mainWindow.FindFirstDescendant(cf => cf.ByName("Processing").And(cf.ByControlType(ControlType.Button)))?.AsButton();
+                    if (processingButton == null && Environment.Is64BitOperatingSystem)
+                    {
+                        processingButton = mainWindow.FindFirstDescendant(cf => cf.ByAutomationId("25003"))?.AsButton();
+                    }
+                    if (processingButton == null) throw new Exception("UI Automation: 'Processing' 버튼을 찾을 수 없습니다.");
+                    processingButton.Click();
                 }
             }
             catch (Exception ex)
             {
                 _logManager.LogError($"[LampLifeService] UI Automation failed: {ex.Message}");
-                return; // 데이터 수집 실패 시 DB 업로드 중단
+                return;
             }
 
             // DB 업로드 로직 (기존 IOnto_LampLT.cs)
