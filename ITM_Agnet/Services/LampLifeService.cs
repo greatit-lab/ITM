@@ -32,7 +32,6 @@ namespace ITM_Agent.Services
         private System.Threading.Timer _collectTimer;
         private bool _isRunning = false;
         private readonly object _lock = new object();
-
         private readonly string PROCESS_NAME;
 
         public LampLifeService(SettingsManager settingsManager, LogManager logManager)
@@ -173,7 +172,6 @@ namespace ITM_Agent.Services
                 return;
             }
 
-            // DB 업로드 로직 (기존 IOnto_LampLT.cs)
             if (collectedLamps.Count > 0)
             {
                 string eqpid = _settingsManager.GetEqpid();
