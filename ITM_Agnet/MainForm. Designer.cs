@@ -1,4 +1,4 @@
-// ITM_Agent\MainForm. Designer.cs
+// ITM_Agent/MainForm.Designer.cs
 using ITM_Agent.Services;
 using System.Drawing;
 using System.Windows.Forms;
@@ -66,6 +66,7 @@ namespace ITM_Agent
         private System.Windows.Forms.ToolStripMenuItem toolStripMenuItem4;
         private System.Windows.Forms.ToolStripMenuItem toolStripMenuItem5;
         private System.Windows.Forms.ToolStripMenuItem toolStripMenuItem6;
+        private System.Windows.Forms.ToolStripMenuItem tsm_LampLifeCollector;
 
         #region Windows Form 디자이너에서 생성한 코드
 
@@ -115,6 +116,7 @@ namespace ITM_Agent
             this.lb_ExcludeList = new System.Windows.Forms.ListBox();
             this.lb_RegexList = new System.Windows.Forms.ListBox();
             this.lb_TargetFolders = new System.Windows.Forms.ListBox();
+            this.tsm_LampLifeCollector = new System.Windows.Forms.ToolStripMenuItem();
             this.menuStrip1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer3)).BeginInit();
             this.splitContainer3.Panel1.SuspendLayout();
@@ -227,11 +229,11 @@ namespace ITM_Agent
             //
             // tsm_Onto
             //
-            this.tsm_Onto.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[]
-            {
+            this.tsm_Onto.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
                 this.tsm_OverrideNames,
                 this.tsm_ImageTrans,
-                this.tsm_UploadData
+                this.tsm_UploadData,
+                this.tsm_LampLifeCollector
             });
             this.tsm_Onto.Name = "tsm_Onto";
             this.tsm_Onto.Size = new System.Drawing.Size(52, 20);
@@ -252,8 +254,14 @@ namespace ITM_Agent
             // tsm_UploadData
             //
             this.tsm_UploadData.Name = "tsm_UploadData";
-            this.tsm_UploadData.Size = new System.Drawing.Size(160, 22);
+            this.tsm_UploadData.Size = new System.Drawing.Size(180, 22);
             this.tsm_UploadData.Text = "Upload Data";
+            // 
+            // tsm_LampLifeCollector
+            // 
+            this.tsm_LampLifeCollector.Name = "tsm_LampLifeCollector";
+            this.tsm_LampLifeCollector.Size = new System.Drawing.Size(180, 22);
+            this.tsm_LampLifeCollector.Text = "Lamp Life Collector";
             //
             // tsm_Nova
             //
@@ -285,10 +293,10 @@ namespace ITM_Agent
             this.toolStripMenuItem6.Size = new System.Drawing.Size(160, 22);
             this.toolStripMenuItem6.Text = "Upload Data";
             //
-            // tsm_Plugin
+            // tsm_Pluginlist
             //
             this.tsm_Plugin.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-              this.pluginList});
+              this.tsm_PluginList});
             this.tsm_Plugin.Name = "tsm_Plugin";
             this.tsm_Plugin.Size = new System.Drawing.Size(53, 20);
             this.tsm_Plugin.Text = "Plugin";
