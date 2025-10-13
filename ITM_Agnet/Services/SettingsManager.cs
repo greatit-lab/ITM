@@ -1,4 +1,4 @@
-// ITM_Agent\Services\SettingsManager.cs
+// ITM_Agent/Services/SettingsManager.cs
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -69,6 +69,26 @@ namespace ITM_Agent.Services
             }
             set => SetValueToSection("Option", "InfoRetentionDays",
                                      value.ToString());
+        }
+
+        public bool IsLampLifeCollectorEnabled
+        {
+            get => GetValueFromSection("LampLifeCollector", "Enabled") == "1";
+            set => SetValueToSection("LampLifeCollector", "Enabled", value ? "1" : "0");
+        }
+
+        public int LampLifeCollectorInterval
+        {
+            get
+            {
+                var raw = GetValueFromSection("LampLifeCollector", "IntervalMinutes");
+                if (int.TryParse(raw, out int interval) && interval > 0)
+                {
+                    return interval;
+                }
+                return 60; // 기본값 60분
+            }
+            set => SetValueToSection("LampLifeCollector", "IntervalMinutes", value.ToString());
         }
 
         private void EnsureSettingsFileExists()
