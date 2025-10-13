@@ -229,7 +229,8 @@ namespace ITM_Agent
             //
             // tsm_Onto
             //
-            this.tsm_Onto.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.tsm_Onto.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[]
+            {
                 this.tsm_OverrideNames,
                 this.tsm_ImageTrans,
                 this.tsm_UploadData,
@@ -293,10 +294,12 @@ namespace ITM_Agent
             this.toolStripMenuItem6.Size = new System.Drawing.Size(160, 22);
             this.toolStripMenuItem6.Text = "Upload Data";
             //
-            // tsm_Pluginlist
+            // tsm_Plugin
             //
-            this.tsm_Plugin.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-              this.tsm_PluginList});
+            this.tsm_Plugin.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[]
+            {
+                this.tsm_PluginList
+            });
             this.tsm_Plugin.Name = "tsm_Plugin";
             this.tsm_Plugin.Size = new System.Drawing.Size(53, 20);
             this.tsm_Plugin.Text = "Plugin";
@@ -433,7 +436,7 @@ namespace ITM_Agent
             this.ts_Status.Size = new System.Drawing.Size(121, 17);
             this.ts_Status.Text = "toolStripStatusLabel1";
             //
-            // statusStrip1 
+            // statusStrip1
             //
             this.statusStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[]
             {
@@ -445,7 +448,7 @@ namespace ITM_Agent
             this.statusStrip1.TabIndex = 2;
             this.statusStrip1.Text = "statusStrip1";
             //
-            // lb_regexPatterns 
+            // lb_regexPatterns
             //
             this.lb_regexPatterns.FormattingEnabled = true;
             this.lb_regexPatterns.ItemHeight = 12;
@@ -454,7 +457,7 @@ namespace ITM_Agent
             this.lb_regexPatterns.Size = new System.Drawing.Size(300, 100);
             this.lb_regexPatterns.TabIndex = 3;
             //
-            // lb_BaseFolder 
+            // lb_BaseFolder
             //
             this.lb_BaseFolder.AutoSize = true;
             this.lb_BaseFolder.Location = new System.Drawing.Point(20, 100);
@@ -463,7 +466,7 @@ namespace ITM_Agent
             this.lb_BaseFolder.TabIndex = 0;
             this.lb_BaseFolder.Text = "(Not Set)";
             //
-            // lb_TargetList 
+            // lb_TargetList
             //
             this.lb_TargetList.FormattingEnabled = true;
             this.lb_TargetList.ItemHeight = 12;
@@ -472,7 +475,7 @@ namespace ITM_Agent
             this.lb_TargetList.Size = new System.Drawing.Size(200, 148);
             this.lb_TargetList.TabIndex = 1;
             //
-            // lb_ExcludeList 
+            // lb_ExcludeList
             //
             this.lb_ExcludeList.FormattingEnabled = true;
             this.lb_ExcludeList.ItemHeight = 12;
@@ -481,7 +484,7 @@ namespace ITM_Agent
             this.lb_ExcludeList.Size = new System.Drawing.Size(200, 148);
             this.lb_ExcludeList.TabIndex = 2;
             //
-            // lb_RegexList 
+            // lb_RegexList
             //
             this.lb_RegexList.FormattingEnabled = true;
             this.lb_RegexList.ItemHeight = 12;
@@ -490,7 +493,7 @@ namespace ITM_Agent
             this.lb_RegexList.Size = new System.Drawing.Size(200, 148);
             this.lb_RegexList.TabIndex = 3;
             //
-            // lb_TargetFolders 
+            // lb_TargetFolders
             //
             this.lb_TargetFolders.ItemHeight = 12;
             this.lb_TargetFolders.Location = new System.Drawing.Point(0, 0);
@@ -500,7 +503,6 @@ namespace ITM_Agent
             //
             // MainForm
             //
-            // 창 핸들이 생성된 후 UpdateMainStatus 실행
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 12F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(676, 431);
@@ -531,7 +533,7 @@ namespace ITM_Agent
             this.PerformLayout();
         }
         #endregion
-        
+
         private ToolStripMenuItem tsm_Plugin;
         private ToolStripMenuItem tsm_PluginList;
         private ToolStripMenuItem tsm_UploadData;
