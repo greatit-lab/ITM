@@ -204,20 +204,32 @@ namespace ITM_Agent.Services
         {
             var dt = new DataTable();
             dt.Columns.Add("eqpid", typeof(string));
-            dt.Columns.Add("collect_time", typeof(DateTime));
+            dt.Columns.Add("ts", typeof(DateTime));
             dt.Columns.Add("lamp_id", typeof(string));
             dt.Columns.Add("age_hour", typeof(int));
             dt.Columns.Add("lifespan_hour", typeof(int));
             dt.Columns.Add("last_changed", typeof(DateTime));
             dt.Columns.Add("serv_ts", typeof(DateTime));
 
-            DateTime collectTime = DateTime.Now;
+            // ▼▼▼ [수정] 시간 계산 로직을 명확하게 분리 ▼▼▼
+
+            // 1. 장비(에이전트)의 현재 시간을 명확히 정의 (밀리초 제거)
+            DateTime now = DateTime.Now;
+            DateTime agent_time = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, now.Second);
+
+            // 2. 서버 보정 시간을 미리 계산
+            DateTime server_time_kst = TimeSyncProvider.Instance.ToSynchronizedKst(agent_time);
+            DateTime server_time = new DateTime(server_time_kst.Year, server_time_kst.Month, server_time_kst.Day, server_time_kst.Hour, server_time_kst.Minute, server_time_kst.Second);
 
             foreach (var lamp in lamps)
             {
                 DataRow row = dt.NewRow();
                 row["eqpid"] = eqpid;
-                row["collect_time"] = collectTime;
+
+                // 3. 각 컬럼에 명확히 할당
+                row["ts"] = agent_time;      // 장비 시간
+                row["serv_ts"] = server_time;  // 서버 보정 시간
+
                 row["lamp_id"] = lamp.LampId;
 
                 if (int.TryParse(lamp.Age, out int age))
@@ -228,9 +240,6 @@ namespace ITM_Agent.Services
 
                 if (DateTime.TryParse(lamp.LastChanged, out DateTime lastChanged))
                     row["last_changed"] = lastChanged;
-
-                DateTime serv_kst = TimeSyncProvider.Instance.ToSynchronizedKst(collectTime);
-                row["serv_ts"] = new DateTime(serv_kst.Year, serv_kst.Month, serv_kst.Day, serv_kst.Hour, serv_kst.Minute, serv_kst.Second);
 
                 dt.Rows.Add(row);
             }
