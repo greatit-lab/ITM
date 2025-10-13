@@ -252,20 +252,47 @@ namespace ITM_Agent.Services
             using (var conn = new NpgsqlConnection(dbInfo.GetConnectionString()))
             {
                 conn.Open();
-                using (var writer = conn.BeginBinaryImport("COPY public.plg_lamp_life (eqpid, collect_time, lamp_id, age_hour, lifespan_hour, last_changed, serv_ts) FROM STDIN (FORMAT BINARY)"))
+                using (var tx = conn.BeginTransaction())
                 {
-                    foreach (DataRow row in dt.Rows)
+                    // ▼▼▼ [수정] SQL 쿼리의 컬럼명 및 파라미터명 변경 (collect_time -> ts) ▼▼▼
+                    const string sql = @"
+                        INSERT INTO public.eqp_lamp_life 
+                            (eqpid, lamp_id, ts, age_hour, lifespan_hour, last_changed, serv_ts)
+                        VALUES 
+                            (@eqpid, @lamp_id, @ts, @age_hour, @lifespan_hour, @last_changed, @serv_ts)
+                        ON CONFLICT (eqpid, lamp_id) DO UPDATE SET
+                            ts = EXCLUDED.ts,
+                            age_hour = EXCLUDED.age_hour,
+                            lifespan_hour = EXCLUDED.lifespan_hour,
+                            last_changed = EXCLUDED.last_changed,
+                            serv_ts = EXCLUDED.serv_ts;";
+
+                    using (var cmd = new NpgsqlCommand(sql, conn, tx))
                     {
-                        writer.StartRow();
-                        writer.Write(row["eqpid"], NpgsqlTypes.NpgsqlDbType.Varchar);
-                        writer.Write((DateTime)row["collect_time"], NpgsqlTypes.NpgsqlDbType.Timestamp);
-                        writer.Write(row["lamp_id"], NpgsqlTypes.NpgsqlDbType.Varchar);
-                        writer.Write((int)row["age_hour"], NpgsqlTypes.NpgsqlDbType.Integer);
-                        writer.Write((int)row["lifespan_hour"], NpgsqlTypes.NpgsqlDbType.Integer);
-                        writer.Write((DateTime)row["last_changed"], NpgsqlTypes.NpgsqlDbType.Timestamp);
-                        writer.Write((DateTime)row["serv_ts"], NpgsqlTypes.NpgsqlDbType.Timestamp);
+                        // 파라미터 미리 정의
+                        cmd.Parameters.Add("@eqpid", NpgsqlTypes.NpgsqlDbType.Varchar);
+                        cmd.Parameters.Add("@lamp_id", NpgsqlTypes.NpgsqlDbType.Varchar);
+                        cmd.Parameters.Add("@ts", NpgsqlTypes.NpgsqlDbType.Timestamp);
+                        cmd.Parameters.Add("@age_hour", NpgsqlTypes.NpgsqlDbType.Integer);
+                        cmd.Parameters.Add("@lifespan_hour", NpgsqlTypes.NpgsqlDbType.Integer);
+                        cmd.Parameters.Add("@last_changed", NpgsqlTypes.NpgsqlDbType.Timestamp);
+                        cmd.Parameters.Add("@serv_ts", NpgsqlTypes.NpgsqlDbType.Timestamp);
+
+                        foreach (DataRow row in dt.Rows)
+                        {
+                            // 각 행의 데이터로 파라미터 값 설정
+                            cmd.Parameters["@eqpid"].Value = row["eqpid"];
+                            cmd.Parameters["@lamp_id"].Value = row["lamp_id"];
+                            cmd.Parameters["@ts"].Value = row["ts"];
+                            cmd.Parameters["@age_hour"].Value = row["age_hour"];
+                            cmd.Parameters["@lifespan_hour"].Value = row["lifespan_hour"];
+                            cmd.Parameters["@last_changed"].Value = row["last_changed"];
+                            cmd.Parameters["@serv_ts"].Value = row["serv_ts"];
+
+                            cmd.ExecuteNonQuery();
+                        }
                     }
-                    writer.Complete();
+                    tx.Commit();
                 }
             }
         }
