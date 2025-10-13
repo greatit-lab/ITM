@@ -17,6 +17,7 @@ namespace ITM_Agent
         private FileWatcherManager fileWatcherManager;
         private EqpidManager eqpidManager;
         private InfoRetentionCleaner infoCleaner;
+        private LampLifeService lampLifeService;
 
         private NotifyIcon trayIcon;
         private ContextMenuStrip trayMenu;
@@ -25,7 +26,7 @@ namespace ITM_Agent
         private ToolStripMenuItem stopItem;
         private ToolStripMenuItem quitItem;
 
-        private const string AppVersion = "v0.0.3.4";
+        private const string AppVersion = "v0.0.4.0";
         internal static string VersionInfo => AppVersion;   // 다른 폼에서 읽기용
 
         ucPanel.ucConfigurationPanel ucSc1;
@@ -42,6 +43,7 @@ namespace ITM_Agent
         // MainForm.cs 상단 (다른 user control 변수들과 함께)
         private ucUploadPanel ucUploadPanel;
         private ucPluginPanel ucPluginPanel;
+        private ucLampLifePanel ucLampLifePanel;
 
         protected override void OnLoad(EventArgs e)
         {
@@ -61,6 +63,8 @@ namespace ITM_Agent
 
             string baseDir = AppDomain.CurrentDomain.BaseDirectory;
             logManager = new LogManager(baseDir);
+
+            lampLifeService = new LampLifeService(this.settingsManager, this.logManager);
 
             InitializeUserControls();
             RegisterMenuEvents();
@@ -294,9 +298,8 @@ namespace ITM_Agent
                 /*──────── File Watcher 시작 ────────*/
                 fileWatcherManager.StartWatching();
 
-                /* ★★★ 핵심 수정 ★★★ */
-                // PerformanceDbWriter.Start 호출 시, MainForm이 가진 eqpidManager 인스턴스를 전달
                 PerformanceDbWriter.Start(lb_eqpid.Text, this.eqpidManager);
+                lampLifeService.Start();
 
                 isRunning = true; // 상태 업데이트
                 UpdateMainStatus("Running...", Color.Blue);
@@ -329,8 +332,9 @@ namespace ITM_Agent
                 try
                 {
                     /*─ FileWatcher + Performance 로깅 중지 ─*/
-                    fileWatcherManager.StopWatchers();           // [기존]
-                    PerformanceDbWriter.Stop();                  // [추가]
+                    fileWatcherManager.StopWatchers();
+                    PerformanceDbWriter.Stop();
+                    lampLifeService.Stop();
 
                     isRunning = false;
 
@@ -391,6 +395,9 @@ namespace ITM_Agent
             {
                 fileWatcherManager?.StopWatchers();
                 fileWatcherManager = null;
+
+                lampLifeService?.Stop();
+                lampLifeService = null;
 
                 /* ▼ InfoRetentionCleaner 정리 ▼ */          // [추가]
                 infoCleaner?.Dispose();
@@ -557,6 +564,8 @@ namespace ITM_Agent
             ucOptionPanel = new ucOptionPanel(settingsManager);
             ucOptionPanel.DebugModeChanged += OptionPanel_DebugModeChanged;
 
+            ucLampLifePanel = new ucLampLifePanel(settingsManager, lampLifeService);
+
             // 7) 필요한 패널 중 디자이너에 배치되지 않은 것만 컨트롤 컬렉션에 추가
             this.Controls.Add(ucOverrideNamesPanel);
 
@@ -577,6 +586,8 @@ namespace ITM_Agent
             tsm_ImageTrans.Click += (s, e) => ShowUserControl(ucImageTransPanel);
             // ONTO -> Upload Data
             tsm_UploadData.Click += (s, e) => ShowUserControl(ucUploadPanel);
+            // ▼▼▼ [추가] Lamp Life Collector 메뉴 이벤트 등록 ▼▼▼
+            tsm_LampLifeCollector.Click += (s, e) => ShowUserControl(ucLampLifePanel);
             // Common -> Plugin
             tsm_PluginList.Click += (s, e) => ShowUserControl(ucPluginPanel);
             // Common → Option
