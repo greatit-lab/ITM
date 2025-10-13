@@ -1,4 +1,4 @@
-// ITM_Agent\Services\FileWatcherManager.cs
+// ITM_Agent/Services/FileWatcherManager.cs
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -151,6 +151,23 @@ namespace ITM_Agent.Services
                 if (isDebugMode)
                     logManager.LogDebug($"[FileWatcherManager] Duplicate event ignored: {e.ChangeType} - {e.FullPath}");
                 return;
+            }
+
+            var excludeFolders = settingsManager.GetFoldersFromSection("[ExcludeFolders]");
+            string changedFolderPath = Path.GetDirectoryName(e.FullPath);
+
+            foreach (var excludeFolder in excludeFolders)
+            {
+                // 경로를 정규화하여 정확한 하위 폴더 여부를 비교합니다.
+                string normalizedExclude = Path.GetFullPath(excludeFolder).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                string normalizedChanged = Path.GetFullPath(changedFolderPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        
+                if (normalizedChanged.StartsWith(normalizedExclude, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (isDebugMode)
+                        logManager.LogDebug($"[FileWatcherManager] File event ignored (in excluded folder): {e.FullPath}");
+                    return; // 제외 폴더에 포함되므로 처리를 중단합니다.
+                }
             }
 
             try
