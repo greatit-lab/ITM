@@ -111,7 +111,6 @@ namespace ITM_Agent.Services
                 _mainForm.ShowTemporarilyForAutomation();
                 await Task.Delay(500);
 
-                // ▼▼▼ [핵심 수정] FlaUI.Core.Application으로 명시하여 모호성을 제거합니다. ▼▼▼
                 var app = FlaUI.Core.Application.Attach(PROCESS_NAME);
                 using (var automation = new UIA3Automation())
                 {
@@ -124,10 +123,20 @@ namespace ITM_Agent.Services
                     if (systemButton == null && Environment.Is64BitOperatingSystem) { systemButton = mainWindow.FindFirstDescendant(cf => cf.ByAutomationId("25004"))?.AsButton(); }
                     if (systemButton == null) throw new Exception("UI Automation: 'System' 버튼을 찾을 수 없습니다.");
                     systemButton.Click();
-                    await Task.Delay(1500);
 
-                    var lampsTab = mainWindow.FindFirstDescendant(cf => cf.ByName("Lamps").And(cf.ByControlType(ControlType.TabItem)))?.AsTabItem();
-                    if (lampsTab == null) throw new Exception("UI Automation: 'Lamps' 탭을 찾을 수 없습니다.");
+                    // ▼▼▼ [핵심 수정] 고정 시간 대기를 폴링(Polling) 방식으로 변경 ▼▼▼
+                    var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+                    FlaUI.Core.AutomationElements.TabItem lampsTab = null;
+                    while (stopwatch.ElapsedMilliseconds < 5000) // 최대 5초 동안 대기
+                    {
+                        lampsTab = mainWindow.FindFirstDescendant(cf => cf.ByName("Lamps").And(cf.ByControlType(ControlType.TabItem)))?.AsTabItem();
+                        if (lampsTab != null) break; // 찾으면 루프 종료
+                        await Task.Delay(200); // 0.2초 간격으로 재시도
+                    }
+
+                    if (lampsTab == null) throw new Exception("UI Automation: 'Lamps' 탭을 찾을 수 없습니다. (Timeout)");
+                    // ▲▲▲ 수정 끝 ▲▲▲
+
                     lampsTab.Select();
                     await Task.Delay(1000);
 
