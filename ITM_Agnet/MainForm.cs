@@ -26,7 +26,7 @@ namespace ITM_Agent
         private ToolStripMenuItem stopItem;
         private ToolStripMenuItem quitItem;
 
-        private const string AppVersion = "v0.0.4.4";
+        private const string AppVersion = "v0.0.4.5";
         internal static string VersionInfo => AppVersion;
 
         ucPanel.ucConfigurationPanel ucSc1;
@@ -63,7 +63,7 @@ namespace ITM_Agent
             string baseDir = AppDomain.CurrentDomain.BaseDirectory;
             logManager = new LogManager(baseDir);
 
-            lampLifeService = new LampLifeService(this.settingsManager, this.logManager);
+            lampLifeService = new LampLifeService(this.settingsManager, this.logManager, this);
 
             InitializeUserControls();
             RegisterMenuEvents();
@@ -179,9 +179,39 @@ namespace ITM_Agent
             if (quitItem != null) quitItem.Enabled = btn_Quit.Enabled;
         }
 
+        // ▼▼▼ [핵심 수정 2/4] 자동화를 위해 폼을 잠시 복원하는 public 메서드를 추가합니다. ▼▼▼
+        public void ShowTemporarilyForAutomation()
+        {
+            if (InvokeRequired)
+            {
+                Invoke(new Action(() => ShowTemporarilyForAutomation()));
+                return;
+            }
+
+            // 폼이 숨겨져 있을 때만 보이도록 처리
+            if (!this.Visible)
+            {
+                this.Show();
+                this.WindowState = FormWindowState.Normal;
+            }
+            // 항상 최상위로 가져와 포커스를 확보
+            this.Activate();
+        }
+
+        // ▼▼▼ [핵심 수정 3/4] 자동화 완료 후 폼을 다시 트레이로 숨기는 public 메서드를 추가합니다. ▼▼▼
+        public void HideToTrayAfterAutomation()
+        {
+            if (InvokeRequired)
+            {
+                Invoke(new Action(() => HideToTrayAfterAutomation()));
+                return;
+            }
+            this.Hide();
+        }
+
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
         {
-            if (e.CloseReason == CloseReason.UserClosing) // X 버튼 클릭 시
+            if (e.CloseReason == CloseReason.UserClosing && !isExiting)
             {
                 e.Cancel = true; // 종료 방지
                 this.Hide(); // 폼을 숨김
@@ -196,7 +226,6 @@ namespace ITM_Agent
                 e.Cancel = true;           // 첫 진입에서는 일단 취소
                 isExiting = true;           // 재진입 차단 플래그       // [추가]
                 PerformQuit();              // 공통 종료 루틴 호출      // [추가]
-                return;
             }
         }
 
@@ -233,6 +262,7 @@ namespace ITM_Agent
             ucUploadPanel?.UpdateStatusOnRun(isRunning);
             ucPluginPanel?.UpdateStatusOnRun(isRunning);
             ucOptionPanel?.UpdateStatusOnRun(isRunning);
+            ucLampLifePanel?.UpdateStatusOnRun(isRunning);
 
             logManager.LogEvent($"Status updated to: {status}");
             if (isDebugMode)
