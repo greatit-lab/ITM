@@ -1,6 +1,7 @@
 // ITM_Agent/Services/PerformanceMonitor.cs
 using System;
 using System.Collections.Generic;
+using System.Diagnostics; // Process 클래스 사용을 위해 추가
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -9,6 +10,13 @@ using System.Security.Principal;
 
 namespace ITM_Agent.Services
 {
+    // ▼▼▼ [추가] 프로세스별 성능 데이터를 담을 클래스 ▼▼▼
+    public sealed class ProcessMetric
+    {
+        public string ProcessName { get; set; }
+        public long MemoryUsageMB { get; set; }
+    }
+
     public sealed class PerformanceMonitor
     {
         private static readonly Lazy<PerformanceMonitor> _inst = new Lazy<PerformanceMonitor>(() => new PerformanceMonitor());
@@ -123,7 +131,9 @@ namespace ITM_Agent.Services
                 {
                     foreach (Metric m in buffer.ToArray())
                     {
-                        sw.WriteLine($"{m.Timestamp:yyyy-MM-dd HH:mm:ss.fff} C:{m.Cpu:F2} M:{m.Mem:F2} CT:{m.CpuTemp:F1} GT:{m.GpuTemp:F1} FAN:{m.FanRpm}");
+                        // ▼▼▼ [수정] 로그 파일에 프로세스 정보도 기록 (디버깅용) ▼▼▼
+                        var topProcessesLog = string.Join(", ", m.TopProcesses.Select(p => $"{p.ProcessName}={p.MemoryUsageMB}MB"));
+                        sw.WriteLine($"{m.Timestamp:yyyy-MM-dd HH:mm:ss.fff} C:{m.Cpu:F2} M:{m.Mem:F2} CT:{m.CpuTemp:F1} GT:{m.GpuTemp:F1} FAN:{m.FanRpm} | Top5: [{topProcessesLog}]");
                     }
                 }
             }
@@ -160,8 +170,10 @@ namespace ITM_Agent.Services
         public float CpuTemp { get; }
         public float GpuTemp { get; }
         public int FanRpm { get; }
+        // ▼▼▼ [추가] 상위 프로세스 목록을 담을 속성 ▼▼▼
+        public List<ProcessMetric> TopProcesses { get; }
 
-        public Metric(float cpu, float mem, float cpuTemp, float gpuTemp, int fanRpm)
+        public Metric(float cpu, float mem, float cpuTemp, float gpuTemp, int fanRpm, List<ProcessMetric> topProcesses)
         {
             Timestamp = DateTime.Now;
             Cpu = cpu;
@@ -169,6 +181,7 @@ namespace ITM_Agent.Services
             CpuTemp = cpuTemp;
             GpuTemp = gpuTemp;
             FanRpm = fanRpm;
+            TopProcesses = topProcesses; // 속성 할당
         }
     }
 
@@ -306,7 +319,27 @@ namespace ITM_Agent.Services
                 fanRpm = (int)(allSensors.FirstOrDefault(s => s.SensorType == SensorType.Fan && s.Name.Contains("CPU"))?.Value ??
                                allSensors.FirstOrDefault(s => s.SensorType == SensorType.Fan)?.Value ?? 0);
 
-                OnSample?.Invoke(new Metric(cpuUsage, memUsage, cpuTemp, gpuTemp, fanRpm));
+                // ▼▼▼ [핵심 추가] 상위 5개 메모리 사용 프로세스 정보 수집 ▼▼▼
+                var topProcesses = new List<ProcessMetric>();
+                try
+                {
+                    topProcesses = Process.GetProcesses()
+                        .OrderByDescending(p => p.WorkingSet64)
+                        .Take(5)
+                        .Select(p => new ProcessMetric
+                        {
+                            ProcessName = p.ProcessName,
+                            MemoryUsageMB = p.WorkingSet64 / (1024 * 1024)
+                        })
+                        .ToList();
+                }
+                catch (Exception procEx)
+                {
+                    logManager.LogDebug($"[HardwareSampler] Failed to get process list: {procEx.Message}");
+                }
+
+                // ▼▼▼ [수정] Metric 생성자에 topProcesses 전달 ▼▼▼
+                OnSample?.Invoke(new Metric(cpuUsage, memUsage, cpuTemp, gpuTemp, fanRpm, topProcesses));
 
                 bool isOver = (cpuUsage > 75f) || (memUsage > 80f);
                 if (isOver && !overload)
