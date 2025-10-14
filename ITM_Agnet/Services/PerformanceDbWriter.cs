@@ -68,7 +68,7 @@ namespace ITM_Agent.Services
             string cs;
             try { cs = DatabaseInfo.CreateDefault().GetConnectionString(); }
             catch { logger.LogError("[Perf] ConnString 실패"); return; }
-            
+
             try
             {
                 using (var conn = new NpgsqlConnection(cs))
@@ -125,13 +125,13 @@ namespace ITM_Agent.Services
                                 "INSERT INTO public.eqp_proc_perf (eqpid, ts, serv_ts, process_name, memory_usage_mb) " +
                                 " VALUES (@eqp, @ts, @srv, @proc_name, @mem_mb) " +
                                 " ON CONFLICT (eqpid, ts, process_name) DO NOTHING;";
-                            
+
                             var pEqp = cmd.Parameters.Add("@eqp", NpgsqlTypes.NpgsqlDbType.Varchar);
                             var pTs = cmd.Parameters.Add("@ts", NpgsqlTypes.NpgsqlDbType.Timestamp);
                             var pSrv = cmd.Parameters.Add("@srv", NpgsqlTypes.NpgsqlDbType.Timestamp);
                             var pProcName = cmd.Parameters.Add("@proc_name", NpgsqlTypes.NpgsqlDbType.Varchar);
                             var pMemMb = cmd.Parameters.Add("@mem_mb", NpgsqlTypes.NpgsqlDbType.Integer);
-                            
+
                             foreach (var m in batch)
                             {
                                 if (m.TopProcesses == null || m.TopProcesses.Count == 0) continue;
@@ -147,7 +147,7 @@ namespace ITM_Agent.Services
                                     var srv = TimeSyncProvider.Instance.ToSynchronizedKst(ts);
                                     srv = new DateTime(srv.Year, srv.Month, srv.Day, srv.Hour, srv.Minute, srv.Second);
                                     pSrv.Value = srv;
-                                    
+
                                     pProcName.Value = proc.ProcessName;
                                     pMemMb.Value = (int)proc.MemoryUsageMB;
 
@@ -155,7 +155,7 @@ namespace ITM_Agent.Services
                                 }
                             }
                         }
-                        
+
                         tx.Commit(); // 모든 작업이 성공하면 커밋
                     }
                 }
