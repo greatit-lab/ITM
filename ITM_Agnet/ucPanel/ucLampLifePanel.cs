@@ -18,12 +18,12 @@ namespace ITM_Agent.ucPanel
             InitializeComponent();
             _settingsManager = settingsManager;
             _lampLifeService = lampLifeService;
-            
+
             _lampLifeService.CollectionCompleted += OnCollectionCompleted;
 
             LoadSettings();
         }
-        
+
         private void OnCollectionCompleted(bool success, DateTime timestamp)
         {
             if (this.InvokeRequired)
@@ -35,7 +35,7 @@ namespace ITM_Agent.ucPanel
                 UpdateLastCollectLabel(success, timestamp);
             }
         }
-        
+
         private void UpdateLastCollectLabel(bool success, DateTime timestamp)
         {
             if (success)
@@ -60,7 +60,7 @@ namespace ITM_Agent.ucPanel
         private void chkEnable_CheckedChanged(object sender, EventArgs e)
         {
             // 실행 중이 아닐 때만 설정 변경 가능
-            if (_isAgentRunning) return; 
+            if (_isAgentRunning) return;
             _settingsManager.IsLampLifeCollectorEnabled = chkEnable.Checked;
             UpdateControlsEnabled();
         }
@@ -68,7 +68,7 @@ namespace ITM_Agent.ucPanel
         private void numInterval_ValueChanged(object sender, EventArgs e)
         {
             // 실행 중이 아닐 때만 설정 변경 가능
-            if (_isAgentRunning) return; 
+            if (_isAgentRunning) return;
             _settingsManager.LampLifeCollectorInterval = (int)numInterval.Value;
         }
 
@@ -96,13 +96,13 @@ namespace ITM_Agent.ucPanel
                 }
             }
         }
-        
+
         public void UpdateStatusOnRun(bool isRunning)
         {
             _isAgentRunning = isRunning;
             UpdateControlsEnabled();
         }
-        
+
         // ▼▼▼ [핵심 수정] 컨트롤 활성화/비활성화 로직 통합 및 수정 ▼▼▼
         private void UpdateControlsEnabled()
         {
