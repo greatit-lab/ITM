@@ -41,7 +41,7 @@ namespace ITM_Agent.Services
         {
             _settingsManager = settingsManager;
             _logManager = logManager;
-            _mainForm = mainForm; 
+            _mainForm = mainForm;
             PROCESS_NAME = Environment.Is64BitOperatingSystem ? "Main64" : "Main";
         }
 
@@ -116,7 +116,7 @@ namespace ITM_Agent.Services
                 using (var automation = new UIA3Automation())
                 {
                     var mainWindow = app.GetMainWindow(automation);
-                    
+
                     mainWindow.SetForeground();
                     await Task.Delay(500);
 
