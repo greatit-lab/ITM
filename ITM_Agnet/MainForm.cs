@@ -26,7 +26,7 @@ namespace ITM_Agent
         private ToolStripMenuItem stopItem;
         private ToolStripMenuItem quitItem;
 
-        private const string AppVersion = "v0.0.4.6";
+        private const string AppVersion = "v0.0.4.7";
         internal static string VersionInfo => AppVersion;
 
         ucPanel.ucConfigurationPanel ucSc1;
@@ -179,7 +179,7 @@ namespace ITM_Agent
             if (quitItem != null) quitItem.Enabled = btn_Quit.Enabled;
         }
 
-        // ▼▼▼ [핵심 수정 2/4] 자동화를 위해 폼을 잠시 복원하는 public 메서드를 추가합니다. ▼▼▼
+        // ▼▼▼ [수정] 자동화를 위해 폼을 잠시 복원하는 public 메서드 ▼▼▼
         public void ShowTemporarilyForAutomation()
         {
             if (InvokeRequired)
@@ -187,6 +187,9 @@ namespace ITM_Agent
                 Invoke(new Action(() => ShowTemporarilyForAutomation()));
                 return;
             }
+
+            // 폼이 다른 창에 가려지지 않도록 최상위로 설정
+            this.TopMost = true;
 
             // 폼이 숨겨져 있을 때만 보이도록 처리
             if (!this.Visible)
@@ -196,9 +199,10 @@ namespace ITM_Agent
             }
             // 항상 최상위로 가져와 포커스를 확보
             this.Activate();
+            this.BringToFront();
         }
 
-        // ▼▼▼ [핵심 수정 3/4] 자동화 완료 후 폼을 다시 트레이로 숨기는 public 메서드를 추가합니다. ▼▼▼
+        // ▼▼▼ [수정] 자동화 완료 후 폼을 다시 트레이로 숨기는 public 메서드 ▼▼▼
         public void HideToTrayAfterAutomation()
         {
             if (InvokeRequired)
@@ -207,6 +211,8 @@ namespace ITM_Agent
                 return;
             }
             this.Hide();
+            // TopMost 속성을 원래대로 복원
+            this.TopMost = false;
         }
 
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
