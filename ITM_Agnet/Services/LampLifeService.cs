@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using ConnectInfo;
 using FlaUI.Core;
 using FlaUI.Core.AutomationElements;
+using FlaUI.Core.Conditions;
 using FlaUI.Core.Definitions;
 using FlaUI.UIA3;
 using Npgsql;
@@ -119,26 +120,29 @@ namespace ITM_Agent.Services
                     mainWindow.SetForeground();
                     await Task.Delay(500);
 
+                    var processingButton = mainWindow.FindFirstDescendant(cf => cf.ByName("Processing").And(cf.ByControlType(ControlType.Button)))?.AsButton();
+                    if (processingButton == null && Environment.Is64BitOperatingSystem) { processingButton = mainWindow.FindFirstDescendant(cf => cf.ByAutomationId("25003"))?.AsButton(); }
+                    if (processingButton == null) throw new Exception("UI Automation: 'Processing' 버튼을 찾을 수 없습니다.");
+                    processingButton.Click();
+                    await Task.Delay(500);
+
                     var systemButton = mainWindow.FindFirstDescendant(cf => cf.ByName("System").And(cf.ByControlType(ControlType.Button)))?.AsButton();
                     if (systemButton == null && Environment.Is64BitOperatingSystem) { systemButton = mainWindow.FindFirstDescendant(cf => cf.ByAutomationId("25004"))?.AsButton(); }
                     if (systemButton == null) throw new Exception("UI Automation: 'System' 버튼을 찾을 수 없습니다.");
                     systemButton.Click();
+                    await Task.Delay(500);
 
-                    // ▼▼▼ [핵심 수정] 고정 시간 대기를 폴링(Polling) 방식으로 변경 ▼▼▼
-                    var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-                    FlaUI.Core.AutomationElements.TabItem lampsTab = null;
-                    while (stopwatch.ElapsedMilliseconds < 5000) // 최대 5초 동안 대기
-                    {
-                        lampsTab = mainWindow.FindFirstDescendant(cf => cf.ByName("Lamps").And(cf.ByControlType(ControlType.TabItem)))?.AsTabItem();
-                        if (lampsTab != null) break; // 찾으면 루프 종료
-                        await Task.Delay(200); // 0.2초 간격으로 재시도
-                    }
+                    // ▼▼▼ [핵심 수정] .Select()를 .Click()으로 변경 ▼▼▼
+                    var statusTab = FindElementWithRetry(mainWindow, cf => cf.ByName("Status").And(cf.ByControlType(ControlType.TabItem)))?.AsTabItem();
+                    if (statusTab == null) throw new Exception("UI Automation: 'Status' 탭을 찾을 수 없습니다. (Timeout)");
+                    statusTab.Click(); // .Select() 대신 .Click() 사용
+                    await Task.Delay(500);
 
+                    var lampsTab = FindElementWithRetry(mainWindow, cf => cf.ByName("Lamps").And(cf.ByControlType(ControlType.TabItem)))?.AsTabItem();
                     if (lampsTab == null) throw new Exception("UI Automation: 'Lamps' 탭을 찾을 수 없습니다. (Timeout)");
-                    // ▲▲▲ 수정 끝 ▲▲▲
-
-                    lampsTab.Select();
+                    lampsTab.Click(); // .Select() 대신 .Click() 사용
                     await Task.Delay(1000);
+                    // ▲▲▲ 수정 끝 ▲▲▲
 
                     var lampList = mainWindow.FindFirstDescendant(cf => cf.ByAutomationId("10819").And(cf.ByControlType(ControlType.List)))?.AsListBox();
                     if (lampList == null) throw new Exception("UI Automation: 'Lamp Status' 목록(ID:10819)을 찾을 수 없습니다.");
@@ -158,7 +162,7 @@ namespace ITM_Agent.Services
                         }
                     }
 
-                    var processingButton = mainWindow.FindFirstDescendant(cf => cf.ByName("Processing").And(cf.ByControlType(ControlType.Button)))?.AsButton();
+                    processingButton = mainWindow.FindFirstDescendant(cf => cf.ByName("Processing").And(cf.ByControlType(ControlType.Button)))?.AsButton();
                     if (processingButton == null && Environment.Is64BitOperatingSystem) { processingButton = mainWindow.FindFirstDescendant(cf => cf.ByAutomationId("25003"))?.AsButton(); }
                     if (processingButton == null) throw new Exception("UI Automation: 'Processing' 버튼을 찾을 수 없습니다.");
                     processingButton.Click();
@@ -200,6 +204,19 @@ namespace ITM_Agent.Services
                 _logManager.LogEvent("[LampLifeService] No lamp data collected to upload.");
                 return true;
             }
+        }
+
+        private AutomationElement FindElementWithRetry(AutomationElement parent, Func<ConditionFactory, ConditionBase> conditionFunc, int timeoutMs = 5000)
+        {
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            AutomationElement element = null;
+            while (stopwatch.ElapsedMilliseconds < timeoutMs)
+            {
+                element = parent.FindFirstDescendant(conditionFunc);
+                if (element != null) break;
+                Thread.Sleep(200);
+            }
+            return element;
         }
 
         private DataTable ParseLampInfoToDataTable(List<LampInfo> lamps, string eqpid)
