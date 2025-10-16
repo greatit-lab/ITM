@@ -131,7 +131,6 @@ namespace ITM_Agent.Services
                 {
                     foreach (Metric m in buffer.ToArray())
                     {
-                        // ▼▼▼ [수정] 로그 파일에 프로세스 정보도 기록 (디버깅용) ▼▼▼
                         var topProcessesLog = string.Join(", ", m.TopProcesses.Select(p => $"{p.ProcessName}={p.MemoryUsageMB}MB"));
                         sw.WriteLine($"{m.Timestamp:yyyy-MM-dd HH:mm:ss.fff} C:{m.Cpu:F2} M:{m.Mem:F2} CT:{m.CpuTemp:F1} GT:{m.GpuTemp:F1} FAN:{m.FanRpm} | Top5: [{topProcessesLog}]");
                     }
@@ -170,7 +169,6 @@ namespace ITM_Agent.Services
         public float CpuTemp { get; }
         public float GpuTemp { get; }
         public int FanRpm { get; }
-        // ▼▼▼ [추가] 상위 프로세스 목록을 담을 속성 ▼▼▼
         public List<ProcessMetric> TopProcesses { get; }
 
         public Metric(float cpu, float mem, float cpuTemp, float gpuTemp, int fanRpm, List<ProcessMetric> topProcesses)
@@ -181,7 +179,7 @@ namespace ITM_Agent.Services
             CpuTemp = cpuTemp;
             GpuTemp = gpuTemp;
             FanRpm = fanRpm;
-            TopProcesses = topProcesses; // 속성 할당
+            TopProcesses = topProcesses;
         }
     }
 
@@ -213,6 +211,10 @@ namespace ITM_Agent.Services
         private int interval;
         private bool overload;
         private readonly LogManager logManager;
+
+        // ▼▼▼ [핵심 수정] 자동 복구를 위한 연속 실패 카운터 추가 ▼▼▼
+        private int _consecutiveFailures = 0;
+        private const int FAILURE_THRESHOLD = 3; // 3회 연속 실패 시 재초기화
 
         public int IntervalMs
         {
@@ -292,13 +294,12 @@ namespace ITM_Agent.Services
                 var memory = computer.Hardware.FirstOrDefault(h => h.HardwareType == HardwareType.Memory);
                 if (memory != null)
                 {
-                    // ▼▼▼ [핵심 수정] 메모리 사용률(%) 센서를 이름에 상관없이 직접 찾도록 수정 ▼▼▼
                     var memoryLoad = memory.Sensors.FirstOrDefault(s => s.SensorType == SensorType.Load);
                     if (memoryLoad?.Value != null)
                     {
                         memUsage = memoryLoad.Value.Value;
                     }
-                    else // 2순위: 수동 계산
+                    else
                     {
                         var used = memory.Sensors.FirstOrDefault(s => s.SensorType == SensorType.Data && s.Name == "Memory Used")?.Value;
                         var total = memory.Sensors.FirstOrDefault(s => s.SensorType == SensorType.Data && s.Name == "Memory Total")?.Value;
@@ -319,7 +320,34 @@ namespace ITM_Agent.Services
                 fanRpm = (int)(allSensors.FirstOrDefault(s => s.SensorType == SensorType.Fan && s.Name.Contains("CPU"))?.Value ??
                                allSensors.FirstOrDefault(s => s.SensorType == SensorType.Fan)?.Value ?? 0);
 
-                // ▼▼▼ [핵심 추가] 상위 5개 메모리 사용 프로세스 정보 수집 ▼▼▼
+                // ▼▼▼ [핵심 수정] 자동 복구 로직 ▼▼▼
+                if (cpuUsage == 0 && memUsage == 0)
+                {
+                    _consecutiveFailures++;
+                    logManager.LogDebug($"[HardwareSampler] Invalid sample detected (CPU and Memory are 0). Consecutive failures: {_consecutiveFailures}");
+
+                    if (_consecutiveFailures >= FAILURE_THRESHOLD)
+                    {
+                        logManager.LogError("[HardwareSampler] Consecutive sensor failures reached threshold. Attempting to re-initialize hardware monitor.");
+                        try
+                        {
+                            computer.Close();
+                            computer.Open();
+                            _consecutiveFailures = 0; // 카운터 초기화
+                            logManager.LogEvent("[HardwareSampler] Hardware monitor re-initialized successfully.");
+                        }
+                        catch (Exception ex)
+                        {
+                            logManager.LogError($"[HardwareSampler] Failed to re-initialize hardware monitor: {ex.Message}");
+                        }
+                    }
+                    return; // 유효하지 않은 샘플은 폐기
+                }
+
+                // 유효한 샘플을 받으면 실패 카운터 초기화
+                _consecutiveFailures = 0;
+                // ▲▲▲ 수정 끝 ▲▲▲
+
                 var topProcesses = new List<ProcessMetric>();
                 try
                 {
@@ -338,7 +366,6 @@ namespace ITM_Agent.Services
                     logManager.LogDebug($"[HardwareSampler] Failed to get process list: {procEx.Message}");
                 }
 
-                // ▼▼▼ [수정] Metric 생성자에 topProcesses 전달 ▼▼▼
                 OnSample?.Invoke(new Metric(cpuUsage, memUsage, cpuTemp, gpuTemp, fanRpm, topProcesses));
 
                 bool isOver = (cpuUsage > 75f) || (memUsage > 80f);
