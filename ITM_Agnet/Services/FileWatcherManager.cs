@@ -274,6 +274,21 @@ namespace ITM_Agent.Services
 
             lock (fileProcessTracker)
             {
+                // ▼▼▼ [추가] 오래된 항목을 삭제하는 로직 ▼▼▼
+                if (fileProcessTracker.Count > 100) // 임계치를 두어 너무 자주 실행되지 않도록 함
+                {
+                    var keysToRemove = fileProcessTracker
+                        .Where(kvp => (now - kvp.Value).TotalMinutes > 1) // 1분 이상 지난 항목
+                        .Select(kvp => kvp.Key)
+                        .ToList();
+
+                    foreach (var key in keysToRemove)
+                    {
+                        fileProcessTracker.Remove(key);
+                    }
+                }
+                // ▲▲▲ 추가 끝 ▲▲▲
+
                 if (fileProcessTracker.TryGetValue(filePath, out var lastProcessed))
                 {
                     if ((now - lastProcessed).TotalMilliseconds < duplicateEventThreshold.TotalMilliseconds)
