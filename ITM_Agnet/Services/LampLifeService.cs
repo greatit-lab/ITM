@@ -133,8 +133,6 @@ namespace ITM_Agent.Services
                     if (systemButton == null) throw new Exception("UI Automation: 'System' 버튼을 찾을 수 없습니다.");
                     systemButton.Click();
                     await Task.Delay(500);
-                    
-                    // ▼▼▼ [핵심 수정] TabControl을 먼저 찾고, 그 안에서 Lamps 탭을 찾도록 변경 ▼▼▼
 
                     // 3. 탭들을 포함하는 부모 'TabControl'이 나타날 때까지 기다립니다.
                     var tabControl = FindElementWithRetry(mainWindow, cf => cf.ByControlType(ControlType.Tab));
@@ -145,8 +143,6 @@ namespace ITM_Agent.Services
                     if (lampsTab == null) throw new Exception("UI Automation: 'Lamps' 탭을 찾을 수 없습니다. (Timeout)");
                     lampsTab.Click(); // .Select() 대신 .Click() 사용
                     await Task.Delay(1000);
-                    
-                    // ▲▲▲ 수정 끝 ▲▲▲
 
                     var lampList = mainWindow.FindFirstDescendant(cf => cf.ByAutomationId("10819").And(cf.ByControlType(ControlType.List)))?.AsListBox();
                     if (lampList == null) throw new Exception("UI Automation: 'Lamp Status' 목록(ID:10819)을 찾을 수 없습니다.");
@@ -210,7 +206,7 @@ namespace ITM_Agent.Services
                 return true;
             }
         }
-        
+
         private AutomationElement FindElementWithRetry(AutomationElement parent, Func<ConditionFactory, ConditionBase> conditionFunc, int timeoutMs = 5000)
         {
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
