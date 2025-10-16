@@ -26,7 +26,7 @@ namespace ITM_Agent
         private ToolStripMenuItem stopItem;
         private ToolStripMenuItem quitItem;
 
-        private const string AppVersion = "v0.0.4.8";
+        private const string AppVersion = "v0.0.4.9";
         internal static string VersionInfo => AppVersion;
 
         ucPanel.ucConfigurationPanel ucSc1;
