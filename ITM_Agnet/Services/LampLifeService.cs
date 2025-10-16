@@ -120,28 +120,32 @@ namespace ITM_Agent.Services
                     mainWindow.SetForeground();
                     await Task.Delay(500);
 
+                    // 1. 'Processing' 버튼을 먼저 클릭하여 UI 상태를 초기화합니다.
                     var processingButton = mainWindow.FindFirstDescendant(cf => cf.ByName("Processing").And(cf.ByControlType(ControlType.Button)))?.AsButton();
                     if (processingButton == null && Environment.Is64BitOperatingSystem) { processingButton = mainWindow.FindFirstDescendant(cf => cf.ByAutomationId("25003"))?.AsButton(); }
                     if (processingButton == null) throw new Exception("UI Automation: 'Processing' 버튼을 찾을 수 없습니다.");
                     processingButton.Click();
                     await Task.Delay(500);
 
+                    // 2. 'System' 버튼을 클릭합니다.
                     var systemButton = mainWindow.FindFirstDescendant(cf => cf.ByName("System").And(cf.ByControlType(ControlType.Button)))?.AsButton();
                     if (systemButton == null && Environment.Is64BitOperatingSystem) { systemButton = mainWindow.FindFirstDescendant(cf => cf.ByAutomationId("25004"))?.AsButton(); }
                     if (systemButton == null) throw new Exception("UI Automation: 'System' 버튼을 찾을 수 없습니다.");
                     systemButton.Click();
                     await Task.Delay(500);
+                    
+                    // ▼▼▼ [핵심 수정] TabControl을 먼저 찾고, 그 안에서 Lamps 탭을 찾도록 변경 ▼▼▼
 
-                    // ▼▼▼ [핵심 수정] .Select()를 .Click()으로 변경 ▼▼▼
-                    var statusTab = FindElementWithRetry(mainWindow, cf => cf.ByName("Status").And(cf.ByControlType(ControlType.TabItem)))?.AsTabItem();
-                    if (statusTab == null) throw new Exception("UI Automation: 'Status' 탭을 찾을 수 없습니다. (Timeout)");
-                    statusTab.Click(); // .Select() 대신 .Click() 사용
-                    await Task.Delay(500);
+                    // 3. 탭들을 포함하는 부모 'TabControl'이 나타날 때까지 기다립니다.
+                    var tabControl = FindElementWithRetry(mainWindow, cf => cf.ByControlType(ControlType.Tab));
+                    if (tabControl == null) throw new Exception("UI Automation: TabControl을 찾을 수 없습니다. (Timeout)");
 
-                    var lampsTab = FindElementWithRetry(mainWindow, cf => cf.ByName("Lamps").And(cf.ByControlType(ControlType.TabItem)))?.AsTabItem();
+                    // 4. TabControl 안에서 'Lamps' 탭을 찾아 클릭합니다. (Status 탭 클릭 과정 생략)
+                    var lampsTab = FindElementWithRetry(tabControl, cf => cf.ByName("Lamps").And(cf.ByControlType(ControlType.TabItem)))?.AsTabItem();
                     if (lampsTab == null) throw new Exception("UI Automation: 'Lamps' 탭을 찾을 수 없습니다. (Timeout)");
                     lampsTab.Click(); // .Select() 대신 .Click() 사용
                     await Task.Delay(1000);
+                    
                     // ▲▲▲ 수정 끝 ▲▲▲
 
                     var lampList = mainWindow.FindFirstDescendant(cf => cf.ByAutomationId("10819").And(cf.ByControlType(ControlType.List)))?.AsListBox();
@@ -162,6 +166,7 @@ namespace ITM_Agent.Services
                         }
                     }
 
+                    // 5. 작업 완료 후, 다시 'Processing' 버튼을 클릭하여 원래 화면으로 복귀합니다.
                     processingButton = mainWindow.FindFirstDescendant(cf => cf.ByName("Processing").And(cf.ByControlType(ControlType.Button)))?.AsButton();
                     if (processingButton == null && Environment.Is64BitOperatingSystem) { processingButton = mainWindow.FindFirstDescendant(cf => cf.ByAutomationId("25003"))?.AsButton(); }
                     if (processingButton == null) throw new Exception("UI Automation: 'Processing' 버튼을 찾을 수 없습니다.");
@@ -205,7 +210,7 @@ namespace ITM_Agent.Services
                 return true;
             }
         }
-
+        
         private AutomationElement FindElementWithRetry(AutomationElement parent, Func<ConditionFactory, ConditionBase> conditionFunc, int timeoutMs = 5000)
         {
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
