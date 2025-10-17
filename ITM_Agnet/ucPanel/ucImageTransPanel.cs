@@ -30,6 +30,9 @@ namespace ITM_Agent.ucPanel
         // 실행 중 여부 (MainForm의 btn_Run으로 제어)
         private bool isRunning = false;
 
+        // ▼▼▼ [추가] 메모리 누수 방지를 위한 주기적 초기화 타이머 ▼▼▼
+        private System.Threading.Timer _cleanupTimer;
+
         // ▼▼▼ 외부 패널에 폴더 변경을 알리기 위한 이벤트 선언 ▼▼▼
         public event Action ImageSaveFolderChanged;
 
@@ -87,13 +90,36 @@ namespace ITM_Agent.ucPanel
             if (isRunning)
             {
                 StartWatchingFolder();
+                // ▼▼▼ [추가] Run 시작 시 메모리 정리 타이머 시작 (24시간마다 실행) ▼▼▼
+                _cleanupTimer = new System.Threading.Timer(
+                    _ => ClearMergedBaseNames(),
+                    null,
+                    TimeSpan.FromHours(24), // 처음 실행까지 24시간 대기
+                    TimeSpan.FromHours(24)  // 이후 24시간 간격으로 반복
+                );
             }
             else
             {
                 StopWatchingFolder();
+                // ▼▼▼ [추가] Stop 시 타이머 해제 ▼▼▼
+                _cleanupTimer?.Dispose();
+                _cleanupTimer = null;
             }
 
             logManager.LogEvent($"[ucImageTransPanel] Status updated to {(runState ? "Running" : "Stopped")}");
+        }
+
+        // ▼▼▼ [추가] 주기적으로 mergedBaseNames를 비우는 메서드 ▼▼▼
+        private void ClearMergedBaseNames()
+        {
+            lock (mergedBaseNames)
+            {
+                if (mergedBaseNames.Count > 0)
+                {
+                    logManager.LogEvent($"[ucImageTransPanel] Clearing {mergedBaseNames.Count} items from mergedBaseNames to prevent memory leak.");
+                    mergedBaseNames.Clear();
+                }
+            }
         }
 
         private void StartWatchingFolder()
