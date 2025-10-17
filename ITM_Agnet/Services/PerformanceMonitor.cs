@@ -10,7 +10,6 @@ using System.Security.Principal;
 
 namespace ITM_Agent.Services
 {
-    // ▼▼▼ [추가] 프로세스별 성능 데이터를 담을 클래스 ▼▼▼
     public sealed class ProcessMetric
     {
         public string ProcessName { get; set; }
@@ -212,9 +211,11 @@ namespace ITM_Agent.Services
         private bool overload;
         private readonly LogManager logManager;
 
-        // ▼▼▼ [핵심 수정] 자동 복구를 위한 연속 실패 카운터 추가 ▼▼▼
         private int _consecutiveFailures = 0;
-        private const int FAILURE_THRESHOLD = 3; // 3회 연속 실패 시 재초기화
+        private const int FAILURE_THRESHOLD = 3;
+        
+        // ▼▼▼ [추가] 초기화 성공 여부 플래그 ▼▼▼
+        private bool _isInitialized = false;
 
         public int IntervalMs
         {
@@ -240,13 +241,15 @@ namespace ITM_Agent.Services
             {
                 if (!IsRunningAsAdmin())
                 {
-                    logManager.LogError("[HardwareSampler] Not running with Administrator privileges. Hardware sensor data may be unavailable.");
+                    logManager.LogError("[HardwareSampler] Not running with Administrator privileges. Hardware sensor data may be unavailable. Please run the agent as an administrator.");
                 }
                 computer.Open();
+                _isInitialized = true; // 초기화 성공 플래그 설정
             }
             catch (Exception ex)
             {
-                logManager.LogError($"[HardwareSampler] Failed to open LibreHardwareMonitor: {ex.Message}");
+                logManager.LogError($"[HardwareSampler] CRITICAL: Failed to open LibreHardwareMonitor on initial load: {ex.Message}. Performance monitoring will be disabled.");
+                _isInitialized = false; // 초기화 실패 플래그 설정
             }
         }
 
@@ -259,7 +262,19 @@ namespace ITM_Agent.Services
             }
         }
 
-        public void Start() => timer = new Timer(_ => Sample(), null, 0, interval);
+        public void Start()
+        {
+            // ▼▼▼ [수정] 초기화에 성공한 경우에만 타이머 시작 ▼▼▼
+            if (_isInitialized)
+            {
+                timer = new Timer(_ => Sample(), null, 0, interval);
+            }
+            else
+            {
+                logManager.LogEvent("[HardwareSampler] Skipping Start() because initial hardware monitor load failed.");
+            }
+        }
+
         public void Stop()
         {
             timer?.Dispose();
@@ -287,8 +302,7 @@ namespace ITM_Agent.Services
                 if (cpu != null)
                 {
                     cpuUsage = cpu.Sensors.FirstOrDefault(s => s.SensorType == SensorType.Load && s.Name == "CPU Total")?.Value ?? 0;
-                    cpuTemp = cpu.Sensors.FirstOrDefault(s => s.SensorType == SensorType.Temperature && s.Name.Contains("Package"))?.Value ??
-                              cpu.Sensors.FirstOrDefault(s => s.SensorType == SensorType.Temperature && s.Name.Contains("Core"))?.Value ?? 0;
+                    cpuTemp = cpu.Sensors.FirstOrDefault(s => s.SensorType == SensorType.Temperature)?.Value ?? 0;
                 }
 
                 var memory = computer.Hardware.FirstOrDefault(h => h.HardwareType == HardwareType.Memory);
@@ -320,11 +334,18 @@ namespace ITM_Agent.Services
                 fanRpm = (int)(allSensors.FirstOrDefault(s => s.SensorType == SensorType.Fan && s.Name.Contains("CPU"))?.Value ??
                                allSensors.FirstOrDefault(s => s.SensorType == SensorType.Fan)?.Value ?? 0);
 
-                // ▼▼▼ [핵심 수정] 자동 복구 로직 ▼▼▼
-                if (cpuUsage == 0 && memUsage == 0)
+                // ▼▼▼ [핵심 수정] 실패 감지 및 로깅 상세화, 자동 복구 로직 개선 ▼▼▼
+                bool hasCpuError = cpuUsage == 0;
+                bool hasMemError = memUsage == 0;
+                bool hasTempError = cpuTemp == 0;
+
+                // CPU와 메모리 사용률이 동시에 0이거나, CPU 온도가 0인 경우를 실패로 간주
+                if ((hasCpuError && hasMemError) || hasTempError)
                 {
                     _consecutiveFailures++;
-                    logManager.LogDebug($"[HardwareSampler] Invalid sample detected (CPU and Memory are 0). Consecutive failures: {_consecutiveFailures}");
+                    // 어떤 값이 0이었는지 상세히 로그에 남김
+                    string failureDetails = $"Invalid sample detected (CPU Usage: {cpuUsage:F2}, Mem Usage: {memUsage:F2}, CPU Temp: {cpuTemp:F1}). Consecutive failures: {_consecutiveFailures}";
+                    logManager.LogDebug($"[HardwareSampler] {failureDetails}");
 
                     if (_consecutiveFailures >= FAILURE_THRESHOLD)
                     {
@@ -333,17 +354,19 @@ namespace ITM_Agent.Services
                         {
                             computer.Close();
                             computer.Open();
-                            _consecutiveFailures = 0; // 카운터 초기화
+                            _consecutiveFailures = 0; // 성공적으로 재시작 시도 후 카운터 초기화
                             logManager.LogEvent("[HardwareSampler] Hardware monitor re-initialized successfully.");
                         }
                         catch (Exception ex)
                         {
-                            logManager.LogError($"[HardwareSampler] Failed to re-initialize hardware monitor: {ex.Message}");
+                            // 재초기화 실패 시, 타이머를 중지하여 반복적인 오류 로그 방지
+                            logManager.LogError($"[HardwareSampler] CRITICAL: Failed to re-initialize hardware monitor: {ex.Message}. Stopping performance sampling.");
+                            this.Stop(); // 샘플링 중단
                         }
                     }
                     return; // 유효하지 않은 샘플은 폐기
                 }
-
+                
                 // 유효한 샘플을 받으면 실패 카운터 초기화
                 _consecutiveFailures = 0;
                 // ▲▲▲ 수정 끝 ▲▲▲
