@@ -213,7 +213,7 @@ namespace ITM_Agent.Services
 
         private int _consecutiveFailures = 0;
         private const int FAILURE_THRESHOLD = 3;
-        
+
         // ▼▼▼ [추가] 초기화 성공 여부 플래그 ▼▼▼
         private bool _isInitialized = false;
 
@@ -366,7 +366,7 @@ namespace ITM_Agent.Services
                     }
                     return; // 유효하지 않은 샘플은 폐기
                 }
-                
+
                 // 유효한 샘플을 받으면 실패 카운터 초기화
                 _consecutiveFailures = 0;
                 // ▲▲▲ 수정 끝 ▲▲▲
