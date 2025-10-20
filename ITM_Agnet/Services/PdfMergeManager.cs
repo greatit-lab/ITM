@@ -32,6 +32,11 @@ namespace ITM_Agent.Services
             }
         }
 
+        /// <summary>
+        /// 기본 생성자
+        /// <summary>
+        /// <param name="defaultOutpufFolder">초기 출력 폴더 경로</param>
+        /// <param name="logManager">LogManager 인스턴스</param>
         public PdfMergeManager(string defaultOutputFolder, LogManager logManager)
         {
             this.logManager = logManager ?? throw new ArgumentNullException(nameof(logManager));
@@ -46,6 +51,9 @@ namespace ITM_Agent.Services
             logManager.LogEvent($"[PdfMergeManager] Initialized with default output folder: {defaultOutputFolder}");
         }
 
+        /// <summary>
+        /// 출력 폴더를 동적으로 변경
+        /// <summary>
         public void UpdateOutputFolder(string outputFolder)
         {
             OutputFolder = outputFolder;
