@@ -455,7 +455,6 @@ namespace ITM_Agent.Services
                 fileName = Path.GetFileName(filePath);
                 if (string.IsNullOrEmpty(fileName))
                 {
-                    // logManager.LogWarning -> LogEvent로 수정
                     logManager.LogEvent($"[FileWatcherManager] Warning: Invalid file path (empty filename): {filePath}");
                     return null;
                 }
