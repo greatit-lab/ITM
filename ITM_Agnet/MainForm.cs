@@ -6,6 +6,8 @@ using System;
 using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
+using System.Reflection;
+using System.Diagnostics;
 
 namespace ITM_Agent
 {
@@ -26,8 +28,25 @@ namespace ITM_Agent
         private ToolStripMenuItem stopItem;
         private ToolStripMenuItem quitItem;
 
-        private const string AppVersion = "v0.0.5.2";
-        internal static string VersionInfo => AppVersion;
+        internal static string VersionInfo
+        {
+            get
+            {
+                try
+                {
+                    // 현재 실행 중인 어셈블리의 파일 버전 정보를 가져옵니다.
+                    var assembly = Assembly.GetExecutingAssembly();
+                    var fvi = FileVersionInfo.GetVersionInfo(assembly.Location);
+                    // "v" 접두사를 붙여 반환합니다 (예: "v1.2.3.4")
+                    return $"v{fvi.FileVersion}";
+                }
+                catch
+                {
+                    // 버전 정보를 가져오는 데 실패하면 기본값 반환
+                    return "vUnknown";
+                }
+            }
+        }
 
         ucPanel.ucConfigurationPanel ucSc1;
 
@@ -77,7 +96,7 @@ namespace ITM_Agent
 
             // FileWatcherManager 생성 (SettingsManager, LogManager, 디버그 모드 플래그)
             fileWatcherManager = new FileWatcherManager(settingsManager, logManager, isDebugMode);
-            eqpidManager = new EqpidManager(settingsManager, logManager, AppVersion);
+            eqpidManager = new EqpidManager(settingsManager, logManager, VersionInfo);
 
             // 기존에 없던 InfoRetentionCleaner 즉시 실행  // [추가]
             infoCleaner = new InfoRetentionCleaner(settingsManager);
@@ -85,7 +104,7 @@ namespace ITM_Agent
             // 아이콘 설정
             SetFormIcon();
 
-            this.Text = $"ITM Agent - {AppVersion}";
+            this.Text = $"ITM Agent - {VersionInfo}";
             this.MaximizeBox = false;
 
             InitializeTrayIcon();
