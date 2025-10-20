@@ -682,7 +682,7 @@ namespace ITM_Agent
 
         private void UpdateMenusBasedOnType()
         {
-            string type = settingsManager.GetType();
+            string type = settingsManager.GetEqpType();
             if (type == "ONTO")
             {
                 tsm_Nova.Visible = false;
