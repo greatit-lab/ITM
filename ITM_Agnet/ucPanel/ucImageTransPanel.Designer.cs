@@ -6,7 +6,7 @@ namespace ITM_Agent.ucPanel
         #pragma warning disable 0414 // 경고 비활성화
         private System.ComponentModel.IContainer components = null;
         #pragma warning restore 0414 // 경고 다시 활성화
-        
+
         private System.Windows.Forms.SplitContainer splitContainer2;
         private System.Windows.Forms.GroupBox groupBox1;
         private System.Windows.Forms.Button btn_FolderClear;
@@ -22,7 +22,7 @@ namespace ITM_Agent.ucPanel
         private System.Windows.Forms.Label lb_ImageSaveFolder;
 
         #region 구성 요소 디자이너에서 생성한 코드
-        
+
         private void InitializeComponent()
         {
             this.splitContainer2 = new System.Windows.Forms.SplitContainer();
