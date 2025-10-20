@@ -1,4 +1,4 @@
-// ITM_Agent\ucPanel\ucConfigurationPanel.Designer.cs
+// ITM_Agent/ucPanel/ucConfigurationPanel.Designer.cs
 namespace ITM_Agent.ucPanel
 {
     partial class ucConfigurationPanel
@@ -35,7 +35,6 @@ namespace ITM_Agent.ucPanel
         private System.Windows.Forms.Button btn_RegRemove;
         private System.Windows.Forms.Button btn_RegEdit;
         private System.Windows.Forms.Button btn_RegAdd;
-        private ucOverrideNamesPanel ucOverrideNamesPanel;
         private System.Windows.Forms.ListBox lb_RegexList;
 
         #region 구성 요소 디자이너에서 생성한 코드
