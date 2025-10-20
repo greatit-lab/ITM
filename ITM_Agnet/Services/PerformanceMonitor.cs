@@ -5,7 +5,6 @@ using System.Collections.Generic;
 using System.Diagnostics; // Process 클래스 사용을 위해 추가
 using System.IO;
 using System.Linq;
-using System.Threading;
 using System.Security.Principal;
 using System.Text;
 using System.Threading;
@@ -324,14 +323,14 @@ namespace ITM_Agent.Services
                 // ▲▲▲ 디버그 로그 추가 끝 ▲▲▲
                 else // 일반 샘플링 시에는 업데이트만 수행
                 {
-                     foreach (var hardware in computer.Hardware)
-                     {
-                         hardware.Update();
-                         foreach (var subHardware in hardware.SubHardware)
-                         {
-                             subHardware.Update();
-                         }
-                     }
+                    foreach (var hardware in computer.Hardware)
+                    {
+                        hardware.Update();
+                        foreach (var subHardware in hardware.SubHardware)
+                        {
+                            subHardware.Update();
+                        }
+                    }
                 }
 
                 var cpu = computer.Hardware.FirstOrDefault(h => h.HardwareType == HardwareType.Cpu);
@@ -360,7 +359,7 @@ namespace ITM_Agent.Services
                     }
                 }
 
-                / GPU 온도 가져오는 부분 수정 (좀 더 유연하게)
+                // GPU 온도 가져오는 부분 수정 (좀 더 유연하게)
                 var gpu = computer.Hardware.FirstOrDefault(h => h.HardwareType == HardwareType.GpuAmd || h.HardwareType == HardwareType.GpuNvidia);
                 if (gpu != null)
                 {
@@ -416,15 +415,24 @@ namespace ITM_Agent.Services
                 var topProcesses = new List<ProcessMetric>();
                 try
                 {
+                    // ▼▼▼ 메모리 수집 로직 수정 ▼▼▼
                     topProcesses = Process.GetProcesses()
-                        .OrderByDescending(p => p.WorkingSet64)
+                        .OrderByDescending(p => p.PrivateMemorySize64) // Private Working Set 기준으로 정렬
                         .Take(5)
-                        .Select(p => new ProcessMetric
-                        {
-                            ProcessName = p.ProcessName,
-                            MemoryUsageMB = p.WorkingSet64 / (1024 * 1024)
+                        .Select(p => {
+                            long privateMemoryMB = p.PrivateMemorySize64 / (1024 * 1024);
+                            long workingSetMB = p.WorkingSet64 / (1024 * 1024);
+                            long sharedMemoryMB = workingSetMB > privateMemoryMB ? workingSetMB - privateMemoryMB : 0; // 공유 메모리 계산
+
+                            return new ProcessMetric
+                            {
+                                ProcessName = p.ProcessName,
+                                MemoryUsageMB = privateMemoryMB,         // Private Working Set 저장
+                                SharedMemoryUsageMB = sharedMemoryMB     // 계산된 공유 메모리 저장
+                            };
                         })
                         .ToList();
+                    // ▲▲▲ 메모리 수집 로직 수정 끝 ▲▲▲
                 }
                 catch (Exception procEx)
                 {
