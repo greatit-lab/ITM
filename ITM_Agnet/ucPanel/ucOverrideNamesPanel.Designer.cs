@@ -1,11 +1,13 @@
-// ITM_Agent\ucPanel\ucOverrideNamesPanel.Designer.cs
+// ITM_Agent/ucPanel/ucOverrideNamesPanel.Designer.cs
 using System.Windows.Forms;
 
 namespace ITM_Agent.ucPanel
 {
     partial class ucOverrideNamesPanel
     {
+        #pragma warning disable 0414 // 경고 비활성화
         private System.ComponentModel.IContainer components = null;
+        #pragma warning restore 0414 // 경고 다시 활성화
 
         private System.Windows.Forms.SplitContainer splitContainer2;
         private System.Windows.Forms.GroupBox groupBox1;
