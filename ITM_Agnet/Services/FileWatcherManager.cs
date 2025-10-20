@@ -204,7 +204,6 @@ namespace ITM_Agent.Services
             // 경로 유효성 검사 추가
             if (string.IsNullOrEmpty(changedFolderPath))
             {
-                 // logManager.LogWarning -> LogEvent로 수정
                 logManager.LogEvent($"[FileWatcherManager] Warning: Could not get directory name for: {e.FullPath}");
                 return;
             }
@@ -225,9 +224,8 @@ namespace ITM_Agent.Services
                 }
                 catch (Exception pathEx)
                 {
-                     // logManager.LogWarning -> LogEvent로 수정
-                     logManager.LogEvent($"[FileWatcherManager] Warning: Error processing exclude path '{excludeFolder}' or changed path '{changedFolderPath}': {pathEx.Message}");
-                     return;
+                    logManager.LogEvent($"[FileWatcherManager] Warning: Error processing exclude path '{excludeFolder}' or changed path '{changedFolderPath}': {pathEx.Message}");
+                    return;
                 }
             }
 
@@ -290,7 +288,7 @@ namespace ITM_Agent.Services
                 }
                 else
                 {
-                     if (IsDebugMode) logManager.LogDebug($"[FileWatcherManager] Ignoring event (file doesn't exist or cannot be read): {e.FullPath}");
+                    if (IsDebugMode) logManager.LogDebug($"[FileWatcherManager] Ignoring event (file doesn't exist or cannot be read): {e.FullPath}");
                 }
             }
             catch (Exception ex)
@@ -316,13 +314,11 @@ namespace ITM_Agent.Services
             }
             catch (UnauthorizedAccessException) // 권한 없음
             {
-                 // logManager.LogWarning -> LogEvent로 수정
                 logManager.LogEvent($"[FileWatcherManager] Warning: No read permission for file: {filePath}");
                 return false;
             }
             catch (Exception ex) // 기타 예외
             {
-                 // logManager.LogWarning -> LogEvent로 수정
                 logManager.LogEvent($"[FileWatcherManager] Warning: Error checking read access for {filePath}: {ex.Message}");
                 return false;
             }
@@ -346,7 +342,7 @@ namespace ITM_Agent.Services
             try { return File.Exists(filePath) ? File.GetLastWriteTimeUtc(filePath) : DateTime.MinValue; }
             catch (Exception ex)
             {
-                 if (IsDebugMode) logManager.LogDebug($"[FileWatcherManager] Error getting write time for {filePath}: {ex.Message}");
+                if (IsDebugMode) logManager.LogDebug($"[FileWatcherManager] Error getting write time for {filePath}: {ex.Message}");
                 return DateTime.MinValue;
             }
         }
@@ -421,8 +417,8 @@ namespace ITM_Agent.Services
                     // 추적 목록 비었으면 타이머 일시 중지
                     if (trackedFiles.Count == 0)
                     {
-                         stabilityCheckTimer?.Change(Timeout.Infinite, Timeout.Infinite); // 다음 이벤트 발생 전까지 중지
-                         if (IsDebugMode) logManager.LogDebug("[FileWatcherManager] Tracking list empty. Stability check timer paused.");
+                        stabilityCheckTimer?.Change(Timeout.Infinite, Timeout.Infinite); // 다음 이벤트 발생 전까지 중지
+                        if (IsDebugMode) logManager.LogDebug("[FileWatcherManager] Tracking list empty. Stability check timer paused.");
                     }
 
                 } // lock 끝
@@ -444,8 +440,8 @@ namespace ITM_Agent.Services
             }
             catch (Exception ex) // 타이머 콜백 자체의 예외 처리
             {
-                 logManager.LogError($"[FileWatcherManager] Unhandled exception in CheckFileStability timer callback: {ex.Message}");
-                 if (IsDebugMode) logManager.LogDebug($"[FileWatcherManager] CheckFileStability Exception details: {ex.StackTrace}");
+                logManager.LogError($"[FileWatcherManager] Unhandled exception in CheckFileStability timer callback: {ex.Message}");
+                if (IsDebugMode) logManager.LogDebug($"[FileWatcherManager] CheckFileStability Exception details: {ex.StackTrace}");
             }
         }
 
@@ -466,9 +462,8 @@ namespace ITM_Agent.Services
             }
             catch (ArgumentException ex) // 경로에 잘못된 문자가 있는 경우
             {
-                 // logManager.LogWarning -> LogEvent로 수정
-                 logManager.LogEvent($"[FileWatcherManager] Warning: Invalid file path characters: {filePath}. Error: {ex.Message}");
-                 return null;
+                logManager.LogEvent($"[FileWatcherManager] Warning: Invalid file path characters: {filePath}. Error: {ex.Message}");
+                return null;
             }
 
             var regexList = settingsManager.GetRegexList();
@@ -554,7 +549,7 @@ namespace ITM_Agent.Services
                     {
                         fileProcessTracker.Remove(key);
                     }
-                     if (IsDebugMode && keysToRemove.Count > 0) logManager.LogDebug($"[FileWatcherManager] Cleaned {keysToRemove.Count} old entries from duplicate event tracker.");
+                    if (IsDebugMode && keysToRemove.Count > 0) logManager.LogDebug($"[FileWatcherManager] Cleaned {keysToRemove.Count} old entries from duplicate event tracker.");
                 }
 
                 if (fileProcessTracker.TryGetValue(filePath, out var lastProcessed))
@@ -596,13 +591,11 @@ namespace ITM_Agent.Services
             }
             catch (UnauthorizedAccessException) // 접근 권한 없음
             {
-                 // logManager.LogWarning -> LogEvent로 수정
                 logManager.LogEvent($"[FileWatcherManager] Warning: Access denied while checking if file is ready: {filePath}");
                 return false;
             }
             catch (Exception ex) // 기타 예외
             {
-                 // logManager.LogWarning -> LogEvent로 수정
                 logManager.LogEvent($"[FileWatcherManager] Warning: Unexpected error checking if file is ready ({filePath}): {ex.Message}");
                 return false;
             }
