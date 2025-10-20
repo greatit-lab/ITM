@@ -83,7 +83,7 @@ namespace ITM_Agent.Services
             else
             {
                 logManager.LogEvent($"[EqpidManager] Eqpid found: {eqpid}");
-                UploadAgentInfoToDatabase(eqpid, settingsManager.GetType());
+                UploadAgentInfoToDatabase(eqpid, settingsManager.GetEqpType());
             }
         }
 
