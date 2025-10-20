@@ -1,19 +1,22 @@
 // ITM_Agent/Services/PerformanceMonitor.cs
+using LibreHardwareMonitor.Hardware;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics; // Process 클래스 사용을 위해 추가
 using System.IO;
 using System.Linq;
 using System.Threading;
-using LibreHardwareMonitor.Hardware;
 using System.Security.Principal;
+using System.Text;
+using System.Threading;
 
 namespace ITM_Agent.Services
 {
     public sealed class ProcessMetric
     {
         public string ProcessName { get; set; }
-        public long MemoryUsageMB { get; set; }
+        public long MemoryUsageMB { get; set; } // Private Working Set (Private Bytes)
+        public long SharedMemoryUsageMB { get; set; } // 추가: 공유 메모리 사용량
     }
 
     public sealed class PerformanceMonitor
@@ -293,9 +296,42 @@ namespace ITM_Agent.Services
 
             try
             {
-                foreach (var hardware in computer.Hardware)
+                // ▼▼▼ 디버그 로그 추가 ▼▼▼
+                if (LogManager.GlobalDebugEnabled && _consecutiveFailures == 0) // 첫 성공 시 또는 디버그 모드에서 센서 목록 로깅
                 {
-                    hardware.Update();
+                    StringBuilder sensorInfo = new StringBuilder();
+                    sensorInfo.AppendLine("[HardwareSampler] Detected Sensors:");
+                    foreach (var hardware in computer.Hardware)
+                    {
+                        hardware.Update(); // 센서 업데이트
+                        sensorInfo.AppendLine($"  Hardware: {hardware.Name} ({hardware.HardwareType})");
+                        foreach (var sensor in hardware.Sensors)
+                        {
+                            sensorInfo.AppendLine($"    Sensor: {sensor.Name} ({sensor.SensorType}) - Value: {sensor.Value}");
+                        }
+                        foreach (var subHardware in hardware.SubHardware) // 서브 하드웨어도 확인
+                        {
+                            subHardware.Update();
+                            sensorInfo.AppendLine($"    SubHardware: {subHardware.Name} ({subHardware.HardwareType})");
+                            foreach (var sensor in subHardware.Sensors)
+                            {
+                                sensorInfo.AppendLine($"      Sensor: {sensor.Name} ({sensor.SensorType}) - Value: {sensor.Value}");
+                            }
+                        }
+                    }
+                    logManager.LogDebug(sensorInfo.ToString());
+                }
+                // ▲▲▲ 디버그 로그 추가 끝 ▲▲▲
+                else // 일반 샘플링 시에는 업데이트만 수행
+                {
+                     foreach (var hardware in computer.Hardware)
+                     {
+                         hardware.Update();
+                         foreach (var subHardware in hardware.SubHardware)
+                         {
+                             subHardware.Update();
+                         }
+                     }
                 }
 
                 var cpu = computer.Hardware.FirstOrDefault(h => h.HardwareType == HardwareType.Cpu);
@@ -324,15 +360,21 @@ namespace ITM_Agent.Services
                     }
                 }
 
+                / GPU 온도 가져오는 부분 수정 (좀 더 유연하게)
                 var gpu = computer.Hardware.FirstOrDefault(h => h.HardwareType == HardwareType.GpuAmd || h.HardwareType == HardwareType.GpuNvidia);
                 if (gpu != null)
                 {
-                    gpuTemp = gpu.Sensors.FirstOrDefault(s => s.SensorType == SensorType.Temperature && s.Name.Contains("Core"))?.Value ?? 0;
+                    // "Core" 대신 일반적인 GPU 온도 센서 이름 (예: "GPU Core") 또는 첫 번째 온도 센서 사용 시도
+                    gpuTemp = gpu.Sensors.FirstOrDefault(s => s.SensorType == SensorType.Temperature && (s.Name.Contains("Core") || s.Name.Contains("Temp")))?.Value ??
+                              gpu.Sensors.FirstOrDefault(s => s.SensorType == SensorType.Temperature)?.Value ?? 0; // 최후의 수단으로 첫 번째 온도 센서
                 }
 
+                // 팬 속도 가져오는 부분 수정 (좀 더 유연하게)
                 var allSensors = computer.Hardware.SelectMany(h => h.Sensors.Concat(h.SubHardware.SelectMany(sh => sh.Sensors)));
-                fanRpm = (int)(allSensors.FirstOrDefault(s => s.SensorType == SensorType.Fan && s.Name.Contains("CPU"))?.Value ??
-                               allSensors.FirstOrDefault(s => s.SensorType == SensorType.Fan)?.Value ?? 0);
+                // CPU 팬 식별 시도 (다양한 이름 가능성 고려)
+                var cpuFanSensor = allSensors.FirstOrDefault(s => s.SensorType == SensorType.Fan && (s.Name.Contains("CPU") || s.Name.Equals("Fan #1", StringComparison.OrdinalIgnoreCase)));
+                fanRpm = (int)(cpuFanSensor?.Value ?? // CPU 팬을 먼저 찾으면 그 값을 사용
+                               allSensors.FirstOrDefault(s => s.SensorType == SensorType.Fan)?.Value ?? 0); // 못 찾으면 첫 번째 팬 값 사용
 
                 // ▼▼▼ [핵심 수정] 실패 감지 및 로깅 상세화, 자동 복구 로직 개선 ▼▼▼
                 bool hasCpuError = cpuUsage == 0;
