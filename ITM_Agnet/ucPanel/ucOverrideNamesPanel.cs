@@ -19,8 +19,6 @@ namespace ITM_Agent.ucPanel
         private readonly bool isDebugMode;
 
         private FileSystemWatcher folderWatcher;   // 폴더 감시기
-        private List<string> regexFolders;         // 정규표현식과 폴더 정보 저장
-        private string baseFolder;                 // BaseFolder 저장
 
         public event Action<string, Color> StatusUpdated;
         private FileSystemWatcher baselineWatcher;
@@ -78,6 +76,9 @@ namespace ITM_Agent.ucPanel
 
         #region 안정화 감지용 내부 클래스/메서드
 
+        /// <summary>
+        // 파일 추적 정보를 저장하기 위한 클래스
+        /// </summary>
         private class FileTrackingInfo
         {
             public DateTime LastEventTime { get; set; }     // 마지막 이벤트가 감지된 시각
