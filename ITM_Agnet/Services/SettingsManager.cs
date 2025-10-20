@@ -438,7 +438,7 @@ namespace ITM_Agent.Services
             WriteToFileSafely(lines.ToArray());
         }
 
-        public string GetType()
+        public string GetEqpType()
         {
             var lines = File.Exists(settingsFilePath) ? File.ReadAllLines(settingsFilePath).ToList() : new List<string>();
             int sectionIndex = lines.FindIndex(l => l.Trim() == "[Eqpid]");
