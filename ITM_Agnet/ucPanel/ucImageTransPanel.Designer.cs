@@ -1,9 +1,11 @@
-// ITM_Agent\ucPanel\ucImageTransPanel.Designer.cs
+// ITM_Agent/ucPanel/ucImageTransPanel.Designer.cs
 namespace ITM_Agent.ucPanel
 {
     partial class ucImageTransPanel
     {
+        #pragma warning disable 0414 // 경고 비활성화
         private System.ComponentModel.IContainer components = null;
+        #pragma warning restore 0414 // 경고 다시 활성화
         
         private System.Windows.Forms.SplitContainer splitContainer2;
         private System.Windows.Forms.GroupBox groupBox1;
