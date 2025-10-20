@@ -51,13 +51,6 @@ namespace ITM_Agent
         private System.Windows.Forms.ListBox lb_ExcludeList;
         private System.Windows.Forms.Label lb_BaseFolder;
         private System.Windows.Forms.ListBox lb_RegexList;
-        private System.Windows.Forms.Button btn_TargetFolder;
-        private System.Windows.Forms.Button btn_TargetRemove;
-        private System.Windows.Forms.Button btn_ExcludeFolder;
-        private System.Windows.Forms.Button btn_ExcludeRemove;
-        private System.Windows.Forms.Button btn_RegAdd;
-        private System.Windows.Forms.Button btn_RegEdit;
-        private System.Windows.Forms.Button btn_RegRemove;
         private System.Windows.Forms.ToolStripMenuItem toolStripMenuItem8;
         private System.Windows.Forms.ToolStripMenuItem tsm_Categorize;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator9;
