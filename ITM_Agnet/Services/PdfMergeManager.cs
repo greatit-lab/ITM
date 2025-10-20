@@ -1,4 +1,4 @@
-// ITM_Agent\Services\PdfMergeManager.cs
+// ITM_Agent/Services/PdfMergeManager.cs
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -17,7 +17,6 @@ namespace ITM_Agent.Services
     {
         private readonly LogManager logManager; // 로깅 관리자
         private string _outputFolder;
-        private readonly bool isDebugMode;
 
         private string OutputFolder
         {
@@ -110,7 +109,7 @@ namespace ITM_Agent.Services
                             img.SetHeight(h);
                             document.Add(img);
 
-                            if (isDebugMode)
+                            if (LogManager.GlobalDebugEnabled)
                                 logManager.LogDebug($"[PdfMergeManager] Added page {i + 1}: {imgPath} ({w}x{h})");
                         }
                         catch (Exception exImg)
@@ -128,7 +127,7 @@ namespace ITM_Agent.Services
                     if (DeleteFileWithRetry(imgPath, maxRetry: 5, delayMs: 300))   // [수정]
                     {
                         delOk++;
-                        if (isDebugMode)
+                        if (LogManager.GlobalDebugEnabled)
                             logManager.LogDebug($"[PdfMergeManager] Deleted image file: {imgPath}");
                     }
                     else
