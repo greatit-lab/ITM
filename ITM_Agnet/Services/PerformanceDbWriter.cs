@@ -159,6 +159,7 @@ namespace ITM_Agent.Services
                                 }
                             }
                         }
+                        // ▲▲▲ eqp_proc_perf 테이블 INSERT 로직 수정 끝 ▲▲▲
 
                         tx.Commit(); // 모든 작업이 성공하면 커밋
                     }
