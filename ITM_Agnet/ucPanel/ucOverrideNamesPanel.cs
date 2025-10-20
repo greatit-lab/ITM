@@ -77,7 +77,7 @@ namespace ITM_Agent.ucPanel
         #region 안정화 감지용 내부 클래스/메서드
 
         /// <summary>
-        // 파일 추적 정보를 저장하기 위한 클래스
+        /// 파일 추적 정보를 저장하기 위한 클래스
         /// </summary>
         private class FileTrackingInfo
         {
