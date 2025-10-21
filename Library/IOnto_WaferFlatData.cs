@@ -345,7 +345,7 @@ namespace Onto_WaferFlatDataLib
         #region === DB Upload ===
         private void UploadToSQL(DataTable dt, string srcFile)
         {
-            // (상단 생략 없음: 전체 메서드)
+            // (기존) serv_ts, eqpid 컬럼 추가 로직
             if (!dt.Columns.Contains("serv_ts"))
                 dt.Columns.Add("serv_ts", typeof(DateTime));
             if (!dt.Columns.Contains("eqpid"))
@@ -356,66 +356,120 @@ namespace Onto_WaferFlatDataLib
                 if (r["datetime"] != DBNull.Value)
                 {
                     DateTime ts = (DateTime)r["datetime"];
-                    r["serv_ts"] = ITM_Agent.Services.TimeSyncProvider.Instance.ToSynchronizedKst(ts);
+                    r["serv_ts"] = ITM_Agent.Services.TimeSyncProvider.Instance.ToSynchronizedKst(ts); //
                 }
                 else r["serv_ts"] = DBNull.Value;
             }
 
-            var dbInfo = DatabaseInfo.CreateDefault();
-            using (var conn = new NpgsqlConnection(dbInfo.GetConnectionString()))
+            var dbInfo = DatabaseInfo.CreateDefault(); //
+            using (var conn = new NpgsqlConnection(dbInfo.GetConnectionString())) //
             {
                 conn.Open();
+
+                // --- 칼럼 확인 및 추가 로직 (이전 답변과 동일) ---
+                try
+                {
+                    var existingColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    using (var cmdCheck = new NpgsqlCommand(@"
+                        SELECT column_name
+                        FROM information_schema.columns
+                        WHERE table_schema = 'public' AND table_name = 'plg_wf_flat';", conn))
+                    {
+                        using (var reader = cmdCheck.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                existingColumns.Add(reader.GetString(0));
+                            }
+                        }
+                    }
+
+                    var missingColumns = new List<string>();
+                    foreach (DataColumn dc in dt.Columns)
+                    {
+                        if (!existingColumns.Contains(dc.ColumnName))
+                        {
+                            missingColumns.Add(dc.ColumnName);
+                        }
+                    }
+
+                    if (missingColumns.Count > 0)
+                    {
+                        foreach (string colName in missingColumns)
+                        {
+                            // 데이터 타입을 REAL 로 설정
+                            string alterSql = $"ALTER TABLE public.plg_wf_flat ADD COLUMN \"{colName}\" REAL NULL;"; // REAL 타입 사용
+                            using (var cmdAlter = new NpgsqlCommand(alterSql, conn))
+                            {
+                                cmdAlter.ExecuteNonQuery();
+                                SimpleLogger.Event($"Added missing column to plg_wf_flat: {colName} (Type: REAL)"); //
+                            }
+                        }
+                    }
+                }
+                catch (Exception exSchema)
+                {
+                    SimpleLogger.Error($"Failed to check/add columns for plg_wf_flat: {exSchema.Message}"); //
+                    return;
+                }
+                // --- 칼럼 확인 및 추가 로직 끝 ---
+
+                // 4. 데이터 삽입 (수정된 파라미터 처리 방식)
                 using (var tx = conn.BeginTransaction())
                 {
-                    var cols = dt.Columns.Cast<DataColumn>().Select(c => c.ColumnName).ToArray();
+                    var cols = dt.Columns.Cast<DataColumn>().Select(c => c.ColumnName).ToArray(); //
 
-                    // PostgreSQL은 대소문자/예약어 충돌 방지를 위해 "컬럼" 을 큰따옴표로 감쌉니다
-                    string colList = string.Join(",", cols.Select(c => $"\"{c}\""));
-                    string paramList = string.Join(",", cols.Select(c => "@" + c));
+                    string colList = string.Join(",", cols.Select(c => $"\"{c}\"")); //
+                    string paramList = string.Join(",", cols.Select(c => "@" + c)); //
 
-                    // [수정] 테이블명: public.wf_flat → public.plg_wf_flat
-                    string sql = $"INSERT INTO public.plg_wf_flat ({colList}) VALUES ({paramList});";
+                    // 테이블명 확인: public.plg_wf_flat
+                    string sql = $"INSERT INTO public.plg_wf_flat ({colList}) VALUES ({paramList});"; //
 
-                    using (var cmd = new NpgsqlCommand(sql, conn, tx))
+                    using (var cmd = new NpgsqlCommand(sql, conn, tx)) //
                     {
-                        foreach (var c in cols)
-                            cmd.Parameters.Add(new NpgsqlParameter("@" + c, DbType.Object));
+                        // ★★★ 삭제: 기존의 NpgsqlDbType 명시적 지정 루프 삭제 ★★★
+                        // foreach (var c in cols) { ... }
 
                         int ok = 0;
                         try
                         {
-                            foreach (DataRow r in dt.Rows)
+                            foreach (DataRow r in dt.Rows) //
                             {
-                                foreach (var c in cols)
-                                    cmd.Parameters["@" + c].Value = r[c] ?? DBNull.Value;
+                                // ★★★ 추가: 각 행 처리 전에 파라미터 클리어 ★★★
+                                cmd.Parameters.Clear(); // 중요: 이전 행의 파라미터 제거
 
-                                cmd.ExecuteNonQuery();
+                                // ★★★ 수정: AddWithValue를 사용하여 파라미터 추가 ★★★
+                                foreach (var c in cols)
+                                {
+                                    // Npgsql이 CLR 타입(.NET 타입)을 보고 적절한 DB 타입 핸들러 선택
+                                    cmd.Parameters.AddWithValue("@" + c, r[c] ?? DBNull.Value); //
+                                }
+                                cmd.ExecuteNonQuery(); //
                                 ok++;
                             }
-                            tx.Commit();
-                            SimpleLogger.Debug($"DB OK ▶ {ok} rows");
+                            tx.Commit(); //
+                            SimpleLogger.Debug($"DB OK ▶ {ok} rows inserted/updated into plg_wf_flat"); //
                         }
-                        catch (PostgresException pex) when (pex.SqlState == "23505")
+                        catch (PostgresException pex) when (pex.SqlState == "23505") //
                         {
-                            tx.Rollback();
-                            SimpleLogger.Debug($"Duplicate entry skipped ▶ {pex.Message}");
-                            SimpleLogger.Event($"동일한 데이터가 이미 등록되어 업로드가 생략되었습니다 ▶ {srcFile}");
+                            tx.Rollback(); //
+                            SimpleLogger.Debug($"Duplicate entry skipped ▶ {pex.Detail ?? pex.Message}"); //
+                            SimpleLogger.Event($"동일한 데이터가 이미 등록되어 업로드가 생략되었습니다 ▶ {srcFile}"); //
                         }
-                        catch (PostgresException pex)
+                        catch (PostgresException pex) //
                         {
-                            tx.Rollback();
+                            tx.Rollback(); //
                             var sb = new StringBuilder()
-                                .AppendLine($"PG CODE = {pex.SqlState}")
-                                .AppendLine($"Message  = {pex.Message}")
+                                .AppendLine($"PG CODE = {pex.SqlState}") //
+                                .AppendLine($"Message  = {pex.Message}") //
+                                .AppendLine($"Detail   = {pex.Detail}") //
                                 .AppendLine("SQL      = " + sql);
-                            foreach (NpgsqlParameter p in cmd.Parameters)
-                                sb.AppendLine($"{p.ParameterName} = {p.Value}");
-                            SimpleLogger.Error("DB FAIL ▶ " + sb);
+                            SimpleLogger.Error("DB FAIL (PostgresException) ▶ " + sb); //
                         }
-                        catch (Exception ex)
+                        catch (Exception ex) //
                         {
-                            tx.Rollback();
-                            SimpleLogger.Error("DB FAIL ▶ " + ex);
+                            tx.Rollback(); //
+                            SimpleLogger.Error("DB FAIL (General Exception) ▶ " + ex); //
                         }
                     }
                 }
