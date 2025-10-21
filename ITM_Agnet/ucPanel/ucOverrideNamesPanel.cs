@@ -152,9 +152,9 @@ namespace ITM_Agent.ucPanel
         {
             try
             {
-                if (!WaitForFileReady(filePath, maxRetries: 30, delayMilliseconds: 1000))
+                if (!WaitForFileReady(filePath, maxRetries: 60, delayMilliseconds: 1000))
                 {
-                    logManager.LogError($"[ucOverrideNamesPanel] 파일을 처리할 수 없습니다.(장기 잠김): {filePath}");
+                    logManager.LogEvent($"[ucOverrideNamesPanel] 파일을 처리할 수 없습니다.(장기 잠김): {filePath}");
                     return;
                 }
 
@@ -758,58 +758,96 @@ namespace ITM_Agent.ucPanel
         private string ProcessTargetFile(string targetFile, Dictionary<string, (string TimeInfo, string Prefix, string CInfo)> baselineData)
         {
             // ▼▼▼ [수정] 파일 이름 변경(File.Move)에 대한 재시도 로직 강화 ▼▼▼
+            // 파일이 실제로 처리 가능한 상태인지 먼저 확인
             if (!WaitForFileReady(targetFile, maxRetries: 10, delayMilliseconds: 300))
             {
-                logManager.LogDebug($"[ucOverrideNamesPanel] ProcessTargetFile - 파일이 준비되지 않아 건너뜁니다: {targetFile}");
-                return null;
+                // 파일이 잠겨 있거나 접근 불가능하면 Debug 로그만 남기고 처리 중단
+                if (settingsManager.IsDebugMode) // isDebugMode 사용
+                {
+                    logManager.LogDebug($"[ucOverrideNamesPanel] ProcessTargetFile - 파일이 준비되지 않아 건너뜁니다: {targetFile}");
+                }
+                return null; // 처리 실패 또는 불가능
             }
 
-            string fileName = Path.GetFileName(targetFile);
+            string fileName = Path.GetFileName(targetFile); // 파일 이름 추출
 
+            // Baseline 데이터와 비교하여 변경할 새 이름 찾기
             foreach (var data in baselineData.Values)
             {
+                // 파일 이름에 Baseline 데이터의 TimeInfo와 Prefix가 포함되어 있는지 확인
                 if (fileName.Contains(data.TimeInfo) && fileName.Contains(data.Prefix))
                 {
+                    // "_#1_" 부분을 "_CInfo_" (예: "_C3W1_")로 변경하여 새 이름 생성
                     string newName = Regex.Replace(fileName, @"_#1_", $"_{data.CInfo}_");
-                    if (newName.Equals(fileName, StringComparison.Ordinal))
-                        return null;
 
+                    // 새 이름이 원래 이름과 같다면 변경 불필요, 다음 Baseline 데이터로 넘어감
+                    if (newName.Equals(fileName, StringComparison.Ordinal))
+                    {
+                        continue; // 변경 없음
+                    }
+
+                    // 새 파일 경로 생성
                     string newPath = Path.Combine(Path.GetDirectoryName(targetFile), newName);
 
+                    // 파일 이동 재시도 로직 (최대 10번)
                     const int maxRetries = 10;
                     for (int i = 0; i < maxRetries; i++)
                     {
                         try
                         {
+                            // File.Move 전에 파일 존재 여부 재확인 (경쟁 조건 방지)
                             if (!File.Exists(targetFile))
                             {
-                                if (settingsManager.IsDebugMode)
+                                // 이동 시도 전에 파일이 사라진 경우
+                                if (settingsManager.IsDebugMode) // isDebugMode 사용
                                 {
-                                    logManager.LogDebug($"[ucOverrideNamesPanel] 이동할 원본 파일이 사라졌습니다: {targetFile}");
+                                    logManager.LogDebug($"[ucOverrideNamesPanel] 이동할 원본 파일이 사라졌습니다 (재시도 루프 내 확인): {targetFile}");
                                 }
-                                return null;
+                                return null; // 이미 처리된 것으로 간주하고 종료
                             }
 
+                            // 파일 이동 시도
                             File.Move(targetFile, newPath);
-                            LogFileRename(targetFile, newPath);
-                            return newPath; // 성공
+                            LogFileRename(targetFile, newPath); // 성공 로그 기록
+                            return newPath; // 성공 시 새 경로 반환
                         }
-                        catch (IOException) when (i < maxRetries - 1)
+                        // ▼▼▼ FileNotFoundException 처리 추가 ▼▼▼
+                        catch (System.IO.FileNotFoundException)
                         {
-                            if (settingsManager.IsDebugMode)
+                            // File.Move 시점에 파일이 사라진 경우 (경쟁 조건 가능성)
+                            // Error 대신 Debug 로그 기록 또는 무시
+                            if (settingsManager.IsDebugMode) // isDebugMode 사용
+                            {
+                                logManager.LogDebug($"[ucOverrideNamesPanel] 파일 이동 시 원본 파일을 찾을 수 없음 (FileNotFoundException): {fileName}");
+                            }
+                            // 이미 다른 곳에서 처리되었을 가능성이 있으므로 null 반환 (오류 아님)
+                            return null;
+                        }
+                        // ▲▲▲ FileNotFoundException 처리 끝 ▲▲▲
+                        catch (IOException) when (i < maxRetries - 1) // 마지막 재시도가 아닐 때만 IOException 처리
+                        {
+                            // 파일 잠금 등 IO 관련 예외 발생 시 재시도
+                            if (settingsManager.IsDebugMode) // isDebugMode 사용
                             {
                                 logManager.LogDebug($"[ucOverrideNamesPanel] 파일 이동 잠금 충돌, 재시도 ({i + 1}/{maxRetries}): {fileName}");
                             }
-                            Thread.Sleep(500);
+                            Thread.Sleep(500); // 잠시 대기 후 재시도
                         }
-                        catch (Exception ex)
+                        catch (Exception ex) // 그 외 예외 (UnauthorizedAccessException 등) 또는 마지막 재시도 실패 시
                         {
-                            logManager.LogError($"[ucOverrideNamesPanel] 파일 이름 변경 실패: {fileName}. 이유: {ex.Message}");
-                            return null;
+                            // 최종 실패 시 Error 로그 기록
+                            logManager.LogError($"[ucOverrideNamesPanel] 파일 이름 변경 실패 (재시도 중 오류 발생): {fileName}. 이유: {ex.Message}");
+                            return null; // 실패 시 null 반환
                         }
-                    }
+                    } // 재시도 루프 끝
+
+                    // 모든 재시도 후에도 실패한 경우 (IOException으로 루프 종료)
+                    logManager.LogError($"[ucOverrideNamesPanel] 파일 이름 변경 최종 실패 (최대 재시도 도달): {fileName}");
+                    return null; // 최종 실패 시 null 반환
                 }
-            }
+            } // foreach (var data...) 끝
+
+            // 어떤 Baseline 데이터와도 매칭되지 않은 경우
             return null;
         }
 
