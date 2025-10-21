@@ -1,4 +1,4 @@
-// ITM_Agent\Services\InfoRetentionCleaner.cs
+// ITM_Agent/Services/InfoRetentionCleaner.cs
 using System;
 using System.Globalization;
 using System.IO;
@@ -24,8 +24,8 @@ namespace ITM_Agent.Services
         private static readonly Regex RxHyphen = new Regex(@"(?<!\d)(?<date>\d{4}-\d{2}-\d{2})(?!\d)", RegexOptions.Compiled);
         private static readonly Regex RxYmd = new Regex(@"(?<!\d)(?<ymd>\d{8})(?!\d)", RegexOptions.Compiled);
 
-        //private const int SCAN_INTERVAL_MS = 60 * 60 * 1000;    // 60분 간격
-        private const int SCAN_INTERVAL_MS = 10 * 60 * 1000;
+        //private const int SCAN_INTERVAL_MS = 5 * 60 * 1000;    // 5분 간격
+        private const int SCAN_INTERVAL_MS = 1 * 60 * 60 * 1000;    // 60분 간격
 
         public InfoRetentionCleaner(SettingsManager settingsManager)
         {
@@ -143,9 +143,11 @@ namespace ITM_Agent.Services
         {
             try
             {
+                // 삭제 시도 전에 파일 존재 여부 확인
                 if (!File.Exists(filePath))
                 {
-                    log.LogEvent($"[InfoCleaner] Skip (already removed): {displayName}");
+                    // 파일이 이미 없다면 성공으로 간주하고 Debug 로그 (또는 Event 로그)
+                    log.LogDebug($"[InfoCleaner] Skip (already removed): {displayName}"); // Debug 레벨로 변경 또는 유지
                     return;
                 }
 
@@ -153,28 +155,46 @@ namespace ITM_Agent.Services
                 File.Delete(filePath);
                 log.LogEvent($"[InfoCleaner] Deleted: {displayName}");
             }
+            // ★★★ 시작: FileNotFoundException 처리 추가 ★★★
+            catch (FileNotFoundException)
+            {
+                // 1차 삭제 시도 중 파일이 사라진 경우 (경쟁 조건) - 성공으로 간주
+                log.LogDebug($"[InfoCleaner] File disappeared during first delete attempt (considered successful): {displayName}");
+            }
+            // ★★★ 끝: FileNotFoundException 처리 추가 ★★★
             catch (UnauthorizedAccessException)
             {
-                // 1차 실패 시, 읽기 전용 속성 제거 후 2차 시도
+                // 1차 실패 (권한 문제) 시, 읽기 전용 속성 제거 후 2차 시도
                 try
                 {
+                    // 읽기 전용 속성 확인 및 제거
                     var attrs = File.GetAttributes(filePath);
                     if (attrs.HasFlag(FileAttributes.ReadOnly))
                     {
                         File.SetAttributes(filePath, attrs & ~FileAttributes.ReadOnly);
                     }
+
+                    // 2차 삭제 시도
                     File.Delete(filePath);
                     log.LogEvent($"[InfoCleaner] Deleted (after attribute change): {displayName}");
                 }
+                // ★★★ 시작: FileNotFoundException 처리 추가 (2차 시도) ★★★
+                catch (FileNotFoundException)
+                {
+                    // 2차 삭제 시도 중 파일이 사라진 경우 (경쟁 조건) - 성공으로 간주
+                    log.LogDebug($"[InfoCleaner] File disappeared during second delete attempt (considered successful): {displayName}");
+                }
+                // ★★★ 끝: FileNotFoundException 처리 추가 (2차 시도) ★★★
                 catch (Exception ex2)
                 {
                     // 2차 시도도 실패하면 최종 에러 로그 기록
+                    // 여기서 FileNotFoundException은 위에서 처리되었으므로 다른 종류의 오류임
                     log.LogError($"[InfoCleaner] Delete failed finally for {displayName} -> {ex2.Message}");
                 }
             }
             catch (Exception ex)
             {
-                // 기타 예외 발생 시 에러 로그 기록
+                // 기타 예외 (IOException 등) 발생 시 에러 로그 기록
                 log.LogError($"[InfoCleaner] Delete failed {displayName} -> {ex.Message}");
             }
         }
