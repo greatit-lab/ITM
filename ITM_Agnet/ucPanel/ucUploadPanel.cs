@@ -66,11 +66,11 @@ namespace ITM_Agent.ucPanel
             btn_ImgSet.Click += btn_ImgSet_Click;
             btn_ImgClear.Click += btn_ImgClear_Click;
 
-            this.Load += UcUploadPanel_Load;
-
             // ▼▼▼ Lamp Data용 버튼 이벤트 핸들러 연결 ▼▼▼
             btn_LampSet.Click += btn_LampSet_Click;
             btn_LampClear.Click += btn_LampClear_Click;
+
+            this.Load += UcUploadPanel_Load;
 
             LoadTargetFolderItems(); // ImagePath 로드 로직은 여기서 제거됨
             LoadImageSaveFolder_PathChanged(); // ▼▼▼ ImageTransPanel로부터 경로를 가져오는 메서드 호출 ▼▼▼
