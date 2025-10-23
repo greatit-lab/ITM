@@ -166,7 +166,7 @@ namespace ITM_Agent.ucPanel
             }
             else if (itemName == "Lamp")
             {
-                AddPathToCombo(cb_LampPath, folderPath); 
+                AddPathToCombo(cb_LampPath, folderPath);
                 AddPathToCombo(cb_LampPlugin, pluginName);
                 StartLampFolderWatcher(NormalizePath(folderPath));
             }
