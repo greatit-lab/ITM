@@ -390,7 +390,7 @@ namespace ITM_Agent.Services
 
                     if (_consecutiveFailures >= FAILURE_THRESHOLD)
                     {
-                        logManager.LogError("[HardwareSampler] Consecutive sensor failures reached threshold. Attempting to re-initialize hardware monitor.");
+                        logManager.LogEvent("[HardwareSampler] Consecutive sensor failures reached threshold. Attempting to re-initialize hardware monitor.");
                         try
                         {
                             computer.Close();
