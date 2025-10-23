@@ -1,4 +1,4 @@
-// ITM_Agent\ucPanel\ucUploadPanel.cs
+// ITM_Agent/ucPanel/ucUploadPanel.cs
 using ITM_Agent.Plugins;
 using ITM_Agent.Services;
 using System;
@@ -25,20 +25,22 @@ namespace ITM_Agent.ucPanel
         private SettingsManager settingsManager;
         private LogManager logManager;
         private readonly ucOverrideNamesPanel overridePanel;
-        private readonly ucImageTransPanel imageTransPanel; // ▼▼▼ ImageTransPanel 참조 필드 추가 ▼▼▼
+        private readonly ucImageTransPanel imageTransPanel;
 
         // 각 데이터 타입별 FileSystemWatcher 선언
         private FileSystemWatcher uploadFolderWatcher;
         private FileSystemWatcher preAlignFolderWatcher;
         private FileSystemWatcher errFolderWatcher;
-        private FileSystemWatcher imageFolderWatcher; // ▼▼▼ PDF 이미지용 Watcher 추가 ▼▼▼
+        private FileSystemWatcher imageFolderWatcher;
+        private FileSystemWatcher lampFolderWatcher;
 
         // Settings.ini 키 상수 선언
         private const string UploadSection = "UploadSetting";
         private const string UploadKey_WaferFlat = "WaferFlat";
         private const string UploadKey_PreAlign = "PreAlign";
         private const string UploadKey_Error = "Error";
-        private const string UploadKey_Image = "Image"; // ▼▼▼ PDF 이미지용 키 추가 ▼▼▼
+        private const string UploadKey_Image = "Image";
+        private const string UploadKey_Lamp = "Lamp"; // ▼▼▼ Lamp Data용 키 추가 ▼▼▼
 
         public ucUploadPanel(ucConfigurationPanel configPanel, ucPluginPanel pluginPanel, SettingsManager settingsManager,
             ucOverrideNamesPanel ovPanel, ucImageTransPanel imageTransPanel)
@@ -49,7 +51,7 @@ namespace ITM_Agent.ucPanel
             this.pluginPanel = pluginPanel ?? throw new ArgumentNullException(nameof(pluginPanel));
             this.settingsManager = settingsManager ?? throw new ArgumentNullException(nameof(settingsManager));
             this.overridePanel = ovPanel;
-            this.imageTransPanel = imageTransPanel ?? throw new ArgumentNullException(nameof(imageTransPanel)); // ▼▼▼ 참조 할당 ▼▼▼
+            this.imageTransPanel = imageTransPanel ?? throw new ArgumentNullException(nameof(imageTransPanel));
 
             logManager = new LogManager(AppDomain.CurrentDomain.BaseDirectory);
             this.pluginPanel.PluginsChanged += PluginPanel_PluginsChanged;
@@ -61,12 +63,14 @@ namespace ITM_Agent.ucPanel
             btn_PreAlignClear.Click += btn_PreAlignClear_Click;
             btn_ErrSet.Click += btn_ErrSet_Click;
             btn_ErrClear.Click += btn_ErrClear_Click;
-
-            // ▼▼▼ PDF 이미지용 버튼 이벤트 핸들러 연결 ▼▼▼
             btn_ImgSet.Click += btn_ImgSet_Click;
             btn_ImgClear.Click += btn_ImgClear_Click;
 
             this.Load += UcUploadPanel_Load;
+
+            // ▼▼▼ Lamp Data용 버튼 이벤트 핸들러 연결 ▼▼▼
+            btn_LampSet.Click += btn_LampSet_Click;
+            btn_LampClear.Click += btn_LampClear_Click;
 
             LoadTargetFolderItems(); // ImagePath 로드 로직은 여기서 제거됨
             LoadImageSaveFolder_PathChanged(); // ▼▼▼ ImageTransPanel로부터 경로를 가져오는 메서드 호출 ▼▼▼
@@ -118,6 +122,10 @@ namespace ITM_Agent.ucPanel
             // ▼▼▼ PDF 이미지 설정 로드 추가 ▼▼▼
             string imgLine = settingsManager.GetValueFromSection(UploadSection, UploadKey_Image);
             if (!string.IsNullOrWhiteSpace(imgLine)) RestoreUploadSetting("Image", imgLine);
+
+            // ▼▼▼ Lamp Data 설정 로드 추가 ▼▼▼
+            string lampLine = settingsManager.GetValueFromSection(UploadSection, UploadKey_Lamp);
+            if (!string.IsNullOrWhiteSpace(lampLine)) RestoreUploadSetting("Lamp", lampLine);
         }
 
         private void RestoreUploadSetting(string itemName, string valueLine)
@@ -156,6 +164,12 @@ namespace ITM_Agent.ucPanel
                 AddPathToCombo(cb_ImagePlugin, pluginName);
                 StartImageFolderWatcher(NormalizePath(folderPath));
             }
+            else if (itemName == "Lamp")
+            {
+                AddPathToCombo(cb_LampPath, folderPath); 
+                AddPathToCombo(cb_LampPlugin, pluginName);
+                StartLampFolderWatcher(NormalizePath(folderPath));
+            }
         }
 
         private void LoadTargetFolderItems()
@@ -163,6 +177,7 @@ namespace ITM_Agent.ucPanel
             cb_WaferFlat_Path.Items.Clear();
             cb_PreAlign_Path.Items.Clear();
             cb_ErrPath.Items.Clear();
+            cb_LampPath.Items.Clear();
 
             IEnumerable<string> folders;
             if (configPanel != null)
@@ -178,10 +193,12 @@ namespace ITM_Agent.ucPanel
             cb_WaferFlat_Path.Items.AddRange(arr);
             cb_PreAlign_Path.Items.AddRange(arr);
             cb_ErrPath.Items.AddRange(arr);
+            cb_LampPath.Items.AddRange(arr);
 
             DeduplicateComboItems(cb_WaferFlat_Path);
             DeduplicateComboItems(cb_PreAlign_Path);
             DeduplicateComboItems(cb_ErrPath);
+            DeduplicateComboItems(cb_LampPath);
         }
 
         private void LoadPluginItems()
@@ -189,7 +206,8 @@ namespace ITM_Agent.ucPanel
             cb_FlatPlugin.Items.Clear();
             cb_PreAlignPlugin.Items.Clear();
             cb_ErrPlugin.Items.Clear();
-            cb_ImagePlugin.Items.Clear(); // ▼▼▼ PDF 이미지 플러그인 콤보박스 초기화 ▼▼▼
+            cb_ImagePlugin.Items.Clear();
+            cb_LampPlugin.Items.Clear();
 
             if (pluginPanel == null) return;
 
@@ -198,7 +216,8 @@ namespace ITM_Agent.ucPanel
                 cb_FlatPlugin.Items.Add(p.PluginName);
                 cb_PreAlignPlugin.Items.Add(p.PluginName);
                 cb_ErrPlugin.Items.Add(p.PluginName);
-                cb_ImagePlugin.Items.Add(p.PluginName); // ▼▼▼ PDF 이미지 플러그인 콤보박스에 목록 추가 ▼▼▼
+                cb_ImagePlugin.Items.Add(p.PluginName);
+                cb_LampPlugin.Items.Add(p.PluginName);
             }
         }
 
@@ -332,6 +351,52 @@ namespace ITM_Agent.ucPanel
             logManager.LogEvent($"[UploadPanel] 대기 큐에 추가 (Image): {e.FullPath}");
         }
 
+        // ▼▼▼ Lamp Data용 Watcher Event 및 Start 메서드 추가 ▼▼▼
+        private void StartLampFolderWatcher(string folderPath)
+        {
+            try
+            {
+                folderPath = folderPath.Trim();
+                if (string.IsNullOrEmpty(folderPath)) return;
+                if (!Directory.Exists(folderPath)) Directory.CreateDirectory(folderPath);
+
+                lampFolderWatcher?.Dispose();
+                lampFolderWatcher = new FileSystemWatcher(folderPath)
+                {
+                    Filter = "*.*", // 필요시 "*.log" 등으로 필터링 가능
+                    IncludeSubdirectories = false,
+                    NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite,
+                    EnableRaisingEvents = true
+                };
+                lampFolderWatcher.Created += LampFolderWatcher_Event;
+                lampFolderWatcher.Changed += LampFolderWatcher_Event; // 파일이 완전히 쓰여진 후를 위해 Changed도 감지
+                logManager.LogEvent($"[UploadPanel] Lamp Data 폴더 감시 시작: {folderPath}");
+            }
+            catch (Exception ex)
+            {
+                logManager.LogError($"[UploadPanel] Lamp Data 폴더 감시 시작 실패: {ex.Message}");
+            }
+        }
+
+        private void LampFolderWatcher_Event(object sender, FileSystemEventArgs e)
+        {
+            Thread.Sleep(200); // 파일 쓰기 완료 대기
+            string pluginName = string.Empty;
+
+            if (InvokeRequired)
+                Invoke(new MethodInvoker(() => pluginName = cb_LampPlugin.Text.Trim()));
+            else
+                pluginName = cb_LampPlugin.Text.Trim();
+
+            if (string.IsNullOrEmpty(pluginName))
+            {
+                logManager.LogEvent($"[UploadPanel] Lamp Data 플러그인이 설정되지 않아 처리를 건너뜁니다: {e.FullPath}");
+                return;
+            }
+            uploadQueue.Enqueue(new Tuple<string, string, string>(e.FullPath, pluginName, "Lamp"));
+            logManager.LogEvent($"[UploadPanel] 대기 큐에 추가 (Lamp): {e.FullPath}");
+        }
+
         private async Task ConsumeUploadQueueAsync(CancellationToken token)
         {
             while (!token.IsCancellationRequested)
@@ -354,8 +419,10 @@ namespace ITM_Agent.ucPanel
                     {
                         readyPath = overridePanel?.EnsureOverrideAndReturnPath(rawPath, 3000) ?? rawPath;
                     }
-                    else
+                    // ▼▼▼ Lamp Data는 파일명 변경 로직을 건너뛰도록 수정 ▼▼▼
+                    else if (dataType == "Lamp" || dataType == "PreAlign" || dataType == "Error" || dataType == "Image")
                     {
+                        // Override(rename) 로직이 필요 없는 데이터 타입들
                         logManager.LogEvent($"[UploadPanel] Override(rename) step skipped for {pluginName} (DataType: {dataType}).");
                     }
 
@@ -498,6 +565,44 @@ namespace ITM_Agent.ucPanel
             MessageBox.Show("Image Data 설정이 초기화되었습니다.", "완료", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
+        // ▼▼▼ Lamp Data용 버튼 클릭 이벤트 핸들러 구현 ▼▼▼
+        private void btn_LampSet_Click(object sender, EventArgs e)
+        {
+            string rawFolder = cb_LampPath.Text.Trim();
+            string rawPlugin = cb_LampPlugin.Text.Trim();
+            if (string.IsNullOrEmpty(rawFolder) || string.IsNullOrEmpty(rawPlugin))
+            {
+                MessageBox.Show("Lamp Data 폴더와 플러그인을 모두 선택하세요.", "알림", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            if (!Directory.Exists(rawFolder))
+            {
+                MessageBox.Show("존재하지 않는 폴더입니다.", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            string normalizedFolder = NormalizePath(rawFolder);
+            string iniValue = $"Folder : {normalizedFolder}, Plugin : {rawPlugin}";
+            settingsManager.SetValueToSection(UploadSection, UploadKey_Lamp, iniValue);
+            AddPathToCombo(cb_LampPath, rawFolder);
+            AddPathToCombo(cb_LampPlugin, rawPlugin);
+            DeduplicateComboItems(cb_LampPath);
+            StartLampFolderWatcher(normalizedFolder);
+            MessageBox.Show("Lamp Data 설정이 저장되었습니다.", "완료", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        private void btn_LampClear_Click(object sender, EventArgs e)
+        {
+            cb_LampPath.SelectedIndex = -1;
+            cb_LampPath.Text = string.Empty;
+            cb_LampPlugin.SelectedIndex = -1;
+            cb_LampPlugin.Text = string.Empty;
+            lampFolderWatcher?.Dispose();
+            lampFolderWatcher = null;
+            settingsManager.RemoveKeyFromSection(UploadSection, UploadKey_Lamp);
+            MessageBox.Show("Lamp Data 설정이 초기화되었습니다.", "완료", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
         private void PluginPanel_PluginsChanged(object sender, EventArgs e)
         {
             RefreshPluginCombo();
@@ -513,7 +618,7 @@ namespace ITM_Agent.ucPanel
                 RemovePluginReferences(removed);
             }
 
-            ComboBox[] targets = { cb_FlatPlugin, cb_PreAlignPlugin, cb_ErrPlugin, cb_ImagePlugin }; // ▼▼▼ cb_ImagePlugin 추가 ▼▼▼
+            ComboBox[] targets = { cb_FlatPlugin, cb_PreAlignPlugin, cb_ErrPlugin, cb_ImagePlugin, cb_LampPlugin };
             foreach (var cb in targets)
             {
                 string previouslySelected = cb.Text;
@@ -539,7 +644,8 @@ namespace ITM_Agent.ucPanel
             if (string.Equals(cb_FlatPlugin.Text, pluginName, StringComparison.OrdinalIgnoreCase)) btn_FlatClear_Click(this, EventArgs.Empty);
             if (string.Equals(cb_PreAlignPlugin.Text, pluginName, StringComparison.OrdinalIgnoreCase)) btn_PreAlignClear_Click(this, EventArgs.Empty);
             if (string.Equals(cb_ErrPlugin.Text, pluginName, StringComparison.OrdinalIgnoreCase)) btn_ErrClear_Click(this, EventArgs.Empty);
-            if (string.Equals(cb_ImagePlugin.Text, pluginName, StringComparison.OrdinalIgnoreCase)) btn_ImgClear_Click(this, EventArgs.Empty); // ▼▼▼ 추가 ▼▼▼
+            if (string.Equals(cb_ImagePlugin.Text, pluginName, StringComparison.OrdinalIgnoreCase)) btn_ImgClear_Click(this, EventArgs.Empty);
+            if (string.Equals(cb_LampPlugin.Text, pluginName, StringComparison.OrdinalIgnoreCase)) btn_LampClear_Click(this, EventArgs.Empty);
         }
 
         private bool TryRunProcessAndUpload(string dllPath, string readyPath, out string err)
@@ -602,21 +708,21 @@ namespace ITM_Agent.ucPanel
             btn_ImgClear.Enabled = enabled;
             btn_ErrSet.Enabled = enabled;
             btn_ErrClear.Enabled = enabled;
-            btn_EvSet.Enabled = enabled;
-            btn_EvClear.Enabled = enabled;
+            btn_LampSet.Enabled = enabled;
+            btn_LampClear.Enabled = enabled;
             btn_WaveSet.Enabled = enabled;
             btn_WaveClear.Enabled = enabled;
             cb_WaferFlat_Path.Enabled = enabled;
             cb_PreAlign_Path.Enabled = enabled;
             cb_ImgPath.Enabled = enabled;
             cb_ErrPath.Enabled = enabled;
-            cb_EvPath.Enabled = enabled;
+            cb_LampPath.Enabled = enabled;
             cb_WavePath.Enabled = enabled;
             cb_FlatPlugin.Enabled = enabled;
             cb_PreAlignPlugin.Enabled = enabled;
             cb_ImagePlugin.Enabled = enabled;
             cb_ErrPlugin.Enabled = enabled;
-            cb_EvPlugin.Enabled = enabled;
+            cb_LampPlugin.Enabled = enabled;
             cb_WavePlugin.Enabled = enabled;
         }
 
