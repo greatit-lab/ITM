@@ -81,7 +81,8 @@ namespace ITM_Agent.Services
                         IncludeSubdirectories = true,
                         // NotifyFilter 를 더 상세하게 설정하여 불필요한 이벤트 감소 시도
                         NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size,
-                        InternalBufferSize = 65536 // <-- 이 줄을 추가하세요 (64KB 예시)
+                        //InternalBufferSize = 65536 // <-- 이 줄을 추가하세요 (64KB 예시)
+                        InternalBufferSize = 131072 // 128KB
                     };
 
 
