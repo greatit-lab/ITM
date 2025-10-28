@@ -601,7 +601,8 @@ namespace ITM_Agent.Services
                     logManager.LogEvent($"[FileWatcherManager] Manual scan skipped: Folder '{folderPath}' no longer exists.");
                     return;
                 }
-                var excludeFolders = settingsManager.GetFoldersFromSection("[ExcludeFolders]").Select(p => 
+                var excludeFolders = settingsManager.GetFoldersFromSection("[ExcludeFolders]")
+                    .Select(p => 
                     {
                         try
                         {
@@ -612,11 +613,15 @@ namespace ITM_Agent.Services
                             logManager.LogEvent($"[FileWatcherManager] Manual scan: Invalid exclude path '{p}'.");
                             return null;
                         }
-                    }
-                ).Where(p => p != null).ToList();
+                    })
+                    .Where(p => p != null)
+                    .ToList();
+
                 logManager.LogEvent($"[FileWatcherManager] Starting manual scan for: {folderPath}");
+
                 int scannedFileCount = 0;
                 int processedFileCount = 0;
+
                 try
                 {
                     Directory.EnumerateDirectories(folderPath, "*", SearchOption.TopDirectoryOnly).FirstOrDefault();
@@ -630,21 +635,28 @@ namespace ITM_Agent.Services
                 foreach (string filePath in Directory.EnumerateFiles(folderPath, "*.*", SearchOption.AllDirectories))
                 {
                     scannedFileCount++;
+
                     try
                     {
                         string currentFileDir = Path.GetDirectoryName(filePath);
-                        if (string.IsNullOrEmpty(currentFileDir)) continue;
-                        string normalizedCurrentDir = Path.GetFullPath(currentFileDir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                        if (string.IsNullOrEmpty(currentFileDir))
+                            continue;
+
+                        string normalizedCurrentDir = Path.GetFullPath(currentFileDir)
+                            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
                         bool isExcluded = false;
-                        
                         foreach (string excludePath in excludeFolders)
                         {
                             if (normalizedCurrentDir.StartsWith(excludePath, StringComparison.OrdinalIgnoreCase))
                             {
-                                isExcluded = true; break;
+                                isExcluded = true;
+                                break;
                             }
                         }
-                        if (isExcluded) continue;
+
+                        if (isExcluded)
+                            continue;
                     }
                     catch (PathTooLongException ptle)
                     {
