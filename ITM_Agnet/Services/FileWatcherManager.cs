@@ -196,17 +196,17 @@ namespace ITM_Agent.Services
             string changedFolderPath = null;
             try
             {
-                 changedFolderPath = Path.GetDirectoryName(e.FullPath);
-                 if (string.IsNullOrEmpty(changedFolderPath))
-                 {
-                      logManager.LogEvent($"[FileWatcherManager] Warning: Could not get directory name for: {e.FullPath}. Skipping event.");
-                      return;
-                 }
+                changedFolderPath = Path.GetDirectoryName(e.FullPath);
+                if (string.IsNullOrEmpty(changedFolderPath))
+                {
+                    logManager.LogEvent($"[FileWatcherManager] Warning: Could not get directory name for: {e.FullPath}. Skipping event.");
+                    return;
+                }
             }
             catch (Exception pathEx)
             {
-                 logManager.LogEvent($"[FileWatcherManager] Warning: Error getting directory for '{e.FullPath}': {pathEx.Message}. Skipping event.");
-                 return;
+                logManager.LogEvent($"[FileWatcherManager] Warning: Error getting directory for '{e.FullPath}': {pathEx.Message}. Skipping event.");
+                return;
             }
 
             foreach (var excludeFolder in excludeFolders)
@@ -281,10 +281,10 @@ namespace ITM_Agent.Services
                 {
                     lock (trackingLock)
                     {
-                        if(trackedFiles.ContainsKey(e.FullPath))
+                        if (trackedFiles.ContainsKey(e.FullPath))
                         {
-                             trackedFiles.Remove(e.FullPath);
-                             if (LogManager.GlobalDebugEnabled) logManager.LogDebug($"[FileWatcherManager] Stop tracking (file doesn't exist or cannot be read): {e.FullPath}");
+                            trackedFiles.Remove(e.FullPath);
+                            if (LogManager.GlobalDebugEnabled) logManager.LogDebug($"[FileWatcherManager] Stop tracking (file doesn't exist or cannot be read): {e.FullPath}");
                         }
                     }
                     if (LogManager.GlobalDebugEnabled) logManager.LogDebug($"[FileWatcherManager] Ignoring event (file doesn't exist or cannot be read): {e.FullPath}");
@@ -350,7 +350,7 @@ namespace ITM_Agent.Services
         // CheckFileStability 메서드
         private void CheckFileStability(object state)
         {
-             try
+            try
             {
                 DateTime now = DateTime.UtcNow;
                 var stableFilesToProcess = new List<string>();
@@ -412,9 +412,9 @@ namespace ITM_Agent.Services
                         stabilityCheckTimer?.Change(Timeout.Infinite, Timeout.Infinite);
                         if (LogManager.GlobalDebugEnabled) logManager.LogDebug("[FileWatcherManager] Tracking list empty. Stability check timer paused.");
                     }
-                     else
+                    else
                     {
-                         stabilityCheckTimer?.Change(StabilityCheckIntervalMs, StabilityCheckIntervalMs);
+                        stabilityCheckTimer?.Change(StabilityCheckIntervalMs, StabilityCheckIntervalMs);
                     }
                 } // lock 끝
 
@@ -432,7 +432,7 @@ namespace ITM_Agent.Services
             {
                 logManager.LogError($"[FileWatcherManager] Unhandled exception in CheckFileStability timer callback: {ex.Message}");
                 if (LogManager.GlobalDebugEnabled) logManager.LogDebug($"[FileWatcherManager] CheckFileStability Exception details: {ex.StackTrace}");
-                try { stabilityCheckTimer?.Change(Timeout.Infinite, Timeout.Infinite); } catch {}
+                try { stabilityCheckTimer?.Change(Timeout.Infinite, Timeout.Infinite); } catch { }
             }
         }
 
@@ -440,8 +440,8 @@ namespace ITM_Agent.Services
         // ProcessFile 메서드
         private string ProcessFile(string filePath)
         {
-             string fileName;
-             try { fileName = Path.GetFileName(filePath); if (string.IsNullOrEmpty(fileName)) { logManager.LogEvent($"[FileWatcherManager] Warning: Invalid file path (empty filename): {filePath}"); return null; } } catch (ArgumentException ex) { logManager.LogEvent($"[FileWatcherManager] Warning: Invalid file path characters: {filePath}. Error: {ex.Message}"); return null; }
+            string fileName;
+            try { fileName = Path.GetFileName(filePath); if (string.IsNullOrEmpty(fileName)) { logManager.LogEvent($"[FileWatcherManager] Warning: Invalid file path (empty filename): {filePath}"); return null; } } catch (ArgumentException ex) { logManager.LogEvent($"[FileWatcherManager] Warning: Invalid file path characters: {filePath}. Error: {ex.Message}"); return null; }
 
             var regexList = settingsManager.GetRegexList();
 
@@ -455,12 +455,12 @@ namespace ITM_Agent.Services
                         string destinationFile = Path.Combine(destinationFolder, fileName);
                         try
                         {
-                             Directory.CreateDirectory(destinationFolder);
-                             if (!IsFileReady(filePath)) { logManager.LogEvent($"[FileWatcherManager] File skipped (locked on final check before copy): {fileName}"); return null; }
-                             File.Copy(filePath, destinationFile, true);
-                             logManager.LogEvent($"[FileWatcherManager] File Copied (after stabilization): {fileName} -> {destinationFolder}");
-                             return destinationFolder;
-                         }
+                            Directory.CreateDirectory(destinationFolder);
+                            if (!IsFileReady(filePath)) { logManager.LogEvent($"[FileWatcherManager] File skipped (locked on final check before copy): {fileName}"); return null; }
+                            File.Copy(filePath, destinationFile, true);
+                            logManager.LogEvent($"[FileWatcherManager] File Copied (after stabilization): {fileName} -> {destinationFolder}");
+                            return destinationFolder;
+                        }
                         catch (FileNotFoundException) { logManager.LogEvent($"[FileWatcherManager] Copy skipped: Source file not found: {fileName}"); return null; }
                         catch (IOException ioEx) { logManager.LogError($"[FileWatcherManager] IO Error copying file {fileName} to {destinationFolder}: {ioEx.Message}"); }
                         catch (UnauthorizedAccessException uaEx) { logManager.LogError($"[FileWatcherManager] Access Denied copying file {fileName} to {destinationFolder}: {uaEx.Message}"); }
@@ -519,7 +519,7 @@ namespace ITM_Agent.Services
             catch (FileNotFoundException) { return false; }
             catch (IOException ioEx)
             {
-                 if (LogManager.GlobalDebugEnabled) logManager.LogDebug($"[FileWatcherManager] IsFileReady IO Exception for {filePath}: {ioEx.Message}");
+                if (LogManager.GlobalDebugEnabled) logManager.LogDebug($"[FileWatcherManager] IsFileReady IO Exception for {filePath}: {ioEx.Message}");
                 return false;
             }
             catch (UnauthorizedAccessException)
@@ -566,10 +566,12 @@ namespace ITM_Agent.Services
                             {
                                 if (watchers.Contains(watcher))
                                 {
-                                     watcher.EnableRaisingEvents = true;
-                                     logManager.LogEvent($"[FileWatcherManager] Watcher re-enabled for '{watcher.Path}'.");
-                                } else {
-                                     logManager.LogEvent($"[FileWatcherManager] Watcher for '{watcher.Path}' removed during recovery. Skipping re-enable.");
+                                    watcher.EnableRaisingEvents = true;
+                                    logManager.LogEvent($"[FileWatcherManager] Watcher re-enabled for '{watcher.Path}'.");
+                                }
+                                else
+                                {
+                                    logManager.LogEvent($"[FileWatcherManager] Watcher for '{watcher.Path}' removed during recovery. Skipping re-enable.");
                                 }
                             }
                             catch (ObjectDisposedException) { logManager.LogEvent($"[FileWatcherManager] Watcher for '{watcher.Path}' was disposed. Cannot re-enable."); }
