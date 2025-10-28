@@ -686,7 +686,7 @@ namespace ITM_Agent.Services
                         currentlyTracked = trackedFiles.ContainsKey(filePath);
                     }
 
-                    if(recentlyProcessed || currentlyTracked)
+                    if (recentlyProcessed || currentlyTracked)
                         continue; // 로그 제거됨
 
                     if (IsFileReady(filePath))
