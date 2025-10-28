@@ -596,29 +596,109 @@ namespace ITM_Agent.Services
         {
             try
             {
-                if (!Directory.Exists(folderPath)) { logManager.LogEvent($"[FileWatcherManager] Manual scan skipped: Folder '{folderPath}' no longer exists."); return; }
-                var excludeFolders = settingsManager.GetFoldersFromSection("[ExcludeFolders]").Select(p => { try { return Path.GetFullPath(p).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar); } catch { logManager.LogEvent($"[FileWatcherManager] Manual scan: Invalid exclude path '{p}'."); return null; } }).Where(p => p != null).ToList();
+                if (!Directory.Exists(folderPath))
+                {
+                    logManager.LogEvent($"[FileWatcherManager] Manual scan skipped: Folder '{folderPath}' no longer exists.");
+                    return;
+                }
+                var excludeFolders = settingsManager.GetFoldersFromSection("[ExcludeFolders]").Select(p => 
+                    {
+                        try
+                        {
+                            return Path.GetFullPath(p).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                        }
+                        catch
+                        {
+                            logManager.LogEvent($"[FileWatcherManager] Manual scan: Invalid exclude path '{p}'.");
+                            return null;
+                        }
+                    }
+                ).Where(p => p != null).ToList();
                 logManager.LogEvent($"[FileWatcherManager] Starting manual scan for: {folderPath}");
-                int scannedFileCount = 0; int processedFileCount = 0;
-                try { Directory.EnumerateDirectories(folderPath, "*", SearchOption.TopDirectoryOnly).FirstOrDefault(); } catch (UnauthorizedAccessException uaEx) { logManager.LogError($"[FileWatcherManager] Manual scan: Access denied for top-level folder '{folderPath}'. Cannot scan. Error: {uaEx.Message}"); return; }
+                int scannedFileCount = 0;
+                int processedFileCount = 0;
+                try
+                {
+                    Directory.EnumerateDirectories(folderPath, "*", SearchOption.TopDirectoryOnly).FirstOrDefault();
+                }
+                catch (UnauthorizedAccessException uaEx)
+                {
+                    logManager.LogError($"[FileWatcherManager] Manual scan: Access denied for top-level folder '{folderPath}'. Cannot scan. Error: {uaEx.Message}");
+                    return;
+                }
 
                 foreach (string filePath in Directory.EnumerateFiles(folderPath, "*.*", SearchOption.AllDirectories))
                 {
-                     scannedFileCount++;
-                    try { string currentFileDir = Path.GetDirectoryName(filePath); if (string.IsNullOrEmpty(currentFileDir)) continue; string normalizedCurrentDir = Path.GetFullPath(currentFileDir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar); bool isExcluded = false; foreach(string excludePath in excludeFolders) { if (normalizedCurrentDir.StartsWith(excludePath, StringComparison.OrdinalIgnoreCase)) { isExcluded = true; break; } } if (isExcluded) continue; } catch (PathTooLongException ptle) { logManager.LogEvent($"[FileWatcherManager] Manual scan: Path too long '{filePath}'. Skipping. Error: {ptle.Message}"); continue; } catch (Exception pathEx) { logManager.LogEvent($"[FileWatcherManager] Manual scan: Error processing path for '{filePath}': {pathEx.Message}. Skipping."); continue; }
-                    bool recentlyProcessed = false; lock (fileProcessTracker) { if (fileProcessTracker.TryGetValue(filePath, out var lastProcessed) && (DateTime.UtcNow - lastProcessed).TotalMinutes < 5) recentlyProcessed = true; }
-                     bool currentlyTracked = false; lock (trackingLock) { currentlyTracked = trackedFiles.ContainsKey(filePath); }
-                     if(recentlyProcessed || currentlyTracked) continue; // 로그 제거됨
+                    scannedFileCount++;
+                    try
+                    {
+                        string currentFileDir = Path.GetDirectoryName(filePath);
+                        if (string.IsNullOrEmpty(currentFileDir)) continue;
+                        string normalizedCurrentDir = Path.GetFullPath(currentFileDir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                        bool isExcluded = false;
+                        
+                        foreach (string excludePath in excludeFolders)
+                        {
+                            if (normalizedCurrentDir.StartsWith(excludePath, StringComparison.OrdinalIgnoreCase))
+                            {
+                                isExcluded = true; break;
+                            }
+                        }
+                        if (isExcluded) continue;
+                    }
+                    catch (PathTooLongException ptle)
+                    {
+                        logManager.LogEvent($"[FileWatcherManager] Manual scan: Path too long '{filePath}'. Skipping. Error: {ptle.Message}");
+                        continue;
+                    }
+                    catch (Exception pathEx)
+                    {
+                        logManager.LogEvent($"[FileWatcherManager] Manual scan: Error processing path for '{filePath}': {pathEx.Message}. Skipping.");
+                        continue;
+                    }
+                    bool recentlyProcessed = false;
+                    lock (fileProcessTracker)
+                    {
+                        if (fileProcessTracker.TryGetValue(filePath, out var lastProcessed) && (DateTime.UtcNow - lastProcessed).TotalMinutes < 5) recentlyProcessed = true;
+                    }
+                    bool currentlyTracked = false;
+                    lock (trackingLock)
+                    {
+                        currentlyTracked = trackedFiles.ContainsKey(filePath);
+                    }
+                    if(recentlyProcessed || currentlyTracked) continue; // 로그 제거됨
 
                     if (IsFileReady(filePath))
                     {
-                        try { string result = ProcessFile(filePath); if(result != null) { processedFileCount++; lock(fileProcessTracker) { fileProcessTracker[filePath] = DateTime.UtcNow; } } } catch (Exception processEx) { logManager.LogError($"[FileWatcherManager] Manual scan: Error processing file '{filePath}': {processEx.Message}"); }
+                        try
+                        {
+                            string result = ProcessFile(filePath);
+                            if (result != null)
+                            {
+                                processedFileCount++;
+                                lock (fileProcessTracker)
+                                {
+                                    fileProcessTracker[filePath] = DateTime.UtcNow;
+                                }
+                            }
+                        }
+                        catch (Exception processEx)
+                        {
+                            logManager.LogError($"[FileWatcherManager] Manual scan: Error processing file '{filePath}': {processEx.Message}");
+                        }
                     }
-                     // 잠긴 파일 로그 제거됨
+                    // 잠긴 파일 로그 제거됨
                 }
-                 logManager.LogEvent($"[FileWatcherManager] Manual scan finished for: {folderPath}. Scanned: {scannedFileCount}, Processed: {processedFileCount}.");
-            } catch (UnauthorizedAccessException uaEx) { logManager.LogError($"[FileWatcherManager] Manual scan: Access denied during scan of '{folderPath}'. Error: {uaEx.Message}"); } catch (Exception ex) { logManager.LogError($"[FileWatcherManager] Error during manual scan of folder '{folderPath}': {ex.Message}"); }
+                logManager.LogEvent($"[FileWatcherManager] Manual scan finished for: {folderPath}. Scanned: {scannedFileCount}, Processed: {processedFileCount}.");
+            }
+            catch (UnauthorizedAccessException uaEx)
+            {
+                logManager.LogError($"[FileWatcherManager] Manual scan: Access denied during scan of '{folderPath}'. Error: {uaEx.Message}");
+            }
+            catch (Exception ex)
+            {
+                logManager.LogError($"[FileWatcherManager] Error during manual scan of folder '{folderPath}': {ex.Message}");
+            }
         }
-
     } // Class End
 } // Namespace End
