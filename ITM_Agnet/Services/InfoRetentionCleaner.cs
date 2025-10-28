@@ -25,7 +25,7 @@ namespace ITM_Agent.Services
         private static readonly Regex RxHyphen = new Regex(@"(?<!\d)(?<date>\d{4}-\d{2}-\d{2})(?!\d)", RegexOptions.Compiled);
         private static readonly Regex RxYmd = new Regex(@"(?<!\d)(?<ymd>\d{8})(?!\d)", RegexOptions.Compiled);
 
-        private const int SCAN_INTERVAL_MS = 1 * 60 * 60 * 1000;    // 60분 간격
+        private const int SCAN_INTERVAL_MS = 6 * 60 * 60 * 1000;    // 6시간(6 * 60분) 간격
 
         // 삭제 작업 간 지연 시간 (밀리초) 및 배치 크기
         private const int DELETE_DELAY_MS = 50;
@@ -48,18 +48,18 @@ namespace ITM_Agent.Services
 
             if (!settings.IsInfoDeletionEnabled)
             {
-                 // ▼▼▼ 비활성화 시 로그 추가 ▼▼▼
-                 log.LogEvent("[InfoCleaner] Auto deletion is disabled. Skipping cleanup.");
-                 // ▲▲▲ 추가 끝 ▲▲▲
-                 return;
+                // ▼▼▼ 비활성화 시 로그 추가 ▼▼▼
+                log.LogEvent("[InfoCleaner] Auto deletion is disabled. Skipping cleanup.");
+                // ▲▲▲ 추가 끝 ▲▲▲
+                return;
             }
             int days = settings.InfoRetentionDays;
             if (days <= 0)
             {
-                 // ▼▼▼ 보존 기간 설정 오류 로그 추가 ▼▼▼
-                 log.LogEvent($"[InfoCleaner] Invalid retention period ({days} days). Skipping cleanup.");
-                 // ▲▲▲ 추가 끝 ▲▲▲
-                 return;
+                // ▼▼▼ 보존 기간 설정 오류 로그 추가 ▼▼▼
+                log.LogEvent($"[InfoCleaner] Invalid retention period ({days} days). Skipping cleanup.");
+                // ▲▲▲ 추가 끝 ▲▲▲
+                return;
             }
 
             int totalDeletedCount = 0; // 작업 전체에서 삭제된 파일 수 집계
@@ -94,8 +94,8 @@ namespace ITM_Agent.Services
                                         Thread.Sleep(DELETE_DELAY_MS); // 개별 지연
                                         if (deletedInBatch >= DELETE_BATCH_SIZE)
                                         {
-                                             Thread.Sleep(BATCH_DELAY_MS); // 배치 지연
-                                             deletedInBatch = 0;
+                                            Thread.Sleep(BATCH_DELAY_MS); // 배치 지연
+                                            deletedInBatch = 0;
                                         }
                                     }
                                 }
@@ -116,17 +116,17 @@ namespace ITM_Agent.Services
                     }
                     catch (Exception ex)
                     {
-                         log.LogError($"[InfoCleaner] Error cleaning up Baseline folder '{baselineDir}': {ex.Message}");
+                        log.LogError($"[InfoCleaner] Error cleaning up Baseline folder '{baselineDir}': {ex.Message}");
                     }
                 }
                 else
                 {
-                     log.LogDebug($"[InfoCleaner] Baseline folder not found: {baselineDir}");
+                    log.LogDebug($"[InfoCleaner] Baseline folder not found: {baselineDir}");
                 }
             }
             else
             {
-                 log.LogDebug("[InfoCleaner] BaseFolder not set. Skipping Baseline cleanup.");
+                log.LogDebug("[InfoCleaner] BaseFolder not set. Skipping Baseline cleanup.");
             }
 
 
@@ -148,19 +148,19 @@ namespace ITM_Agent.Services
                         }
                         else
                         {
-                             log.LogDebug($"[InfoCleaner] No files deleted from Regex target folder '{folder}'.");
+                            log.LogDebug($"[InfoCleaner] No files deleted from Regex target folder '{folder}'.");
                         }
                         // ▲▲▲ 추가 끝 ▲▲▲
                     }
                     else
                     {
-                         log.LogEvent($"[InfoCleaner] Regex target folder not found: {folder}");
+                        log.LogEvent($"[InfoCleaner] Regex target folder not found: {folder}");
                     }
                 }
             }
             else
             {
-                 log.LogDebug("[InfoCleaner] No Regex target folders configured. Skipping Regex folders cleanup.");
+                log.LogDebug("[InfoCleaner] No Regex target folders configured. Skipping Regex folders cleanup.");
             }
 
 
@@ -170,7 +170,7 @@ namespace ITM_Agent.Services
             {
                 log.LogEvent($"[InfoCleaner] Starting cleanup for PDF Save folder: {pdfSaveFolder}");
                 int deletedCount = CleanFolderRecursively(pdfSaveFolder, days); // 삭제된 파일 수 반환 받음
-                 // ▼▼▼ PDF 폴더 작업 완료 후 요약 로그 ▼▼▼
+                // ▼▼▼ PDF 폴더 작업 완료 후 요약 로그 ▼▼▼
                 if (deletedCount > 0)
                 {
                     log.LogEvent($"[InfoCleaner] Completed cleanup for PDF Save folder '{pdfSaveFolder}'. Deleted: {deletedCount} files.");
@@ -178,13 +178,13 @@ namespace ITM_Agent.Services
                 }
                 else
                 {
-                     log.LogDebug($"[InfoCleaner] No files deleted from PDF Save folder '{pdfSaveFolder}'.");
+                    log.LogDebug($"[InfoCleaner] No files deleted from PDF Save folder '{pdfSaveFolder}'.");
                 }
-                 // ▲▲▲ 추가 끝 ▲▲▲
+                // ▲▲▲ 추가 끝 ▲▲▲
             }
             else
             {
-                 log.LogDebug("[InfoCleaner] PDF Save folder not set or not found. Skipping PDF folder cleanup.");
+                log.LogDebug("[InfoCleaner] PDF Save folder not set or not found. Skipping PDF folder cleanup.");
             }
 
             // --- 4. 최종 작업 완료 로그 ---
@@ -291,9 +291,9 @@ namespace ITM_Agent.Services
             }
             catch (FileNotFoundException)
             {
-                 // ▼▼▼ 개별 파일 로그는 Debug 레벨로 변경 ▼▼▼
+                // ▼▼▼ 개별 파일 로그는 Debug 레벨로 변경 ▼▼▼
                 log.LogDebug($"[InfoCleaner] File disappeared during delete attempt (considered successful): {displayName}");
-                 // ▲▲▲ 변경 끝 ▲▲▲
+                // ▲▲▲ 변경 끝 ▲▲▲
                 return true;
             }
             catch (UnauthorizedAccessException)
@@ -306,18 +306,18 @@ namespace ITM_Agent.Services
                         File.SetAttributes(filePath, attrs & ~FileAttributes.ReadOnly);
                     }
                     File.Delete(filePath);
-                     // ▼▼▼ 개별 성공 로그 제거 ▼▼▼
+                    // ▼▼▼ 개별 성공 로그 제거 ▼▼▼
                     // log.LogEvent($"[InfoCleaner] Deleted (after attribute change): {displayName}");
                     log.LogDebug($"[InfoCleaner] Deleted (after attribute change): {displayName}"); // Debug 로그로 변경 (선택 사항)
-                     // ▲▲▲ 제거 끝 ▲▲▲
+                    // ▲▲▲ 제거 끝 ▲▲▲
                     return true;
                 }
                 catch (FileNotFoundException)
                 {
                     // ▼▼▼ 개별 파일 로그는 Debug 레벨로 변경 ▼▼▼
-                     log.LogDebug($"[InfoCleaner] File disappeared during second delete attempt (considered successful): {displayName}");
+                    log.LogDebug($"[InfoCleaner] File disappeared during second delete attempt (considered successful): {displayName}");
                     // ▲▲▲ 변경 끝 ▲▲▲
-                     return true;
+                    return true;
                 }
                 catch (Exception ex2)
                 {
@@ -327,8 +327,8 @@ namespace ITM_Agent.Services
             }
             catch (IOException ioEx) // IO 예외 (파일 잠김 등)
             {
-                 log.LogError($"[InfoCleaner] Delete failed (IO Exception) for {displayName} -> {ioEx.Message}");
-                 return false;
+                log.LogError($"[InfoCleaner] Delete failed (IO Exception) for {displayName} -> {ioEx.Message}");
+                return false;
             }
             catch (Exception ex) // 기타 예외
             {
