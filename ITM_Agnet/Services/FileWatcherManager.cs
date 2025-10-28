@@ -601,8 +601,9 @@ namespace ITM_Agent.Services
                     logManager.LogEvent($"[FileWatcherManager] Manual scan skipped: Folder '{folderPath}' no longer exists.");
                     return;
                 }
+
                 var excludeFolders = settingsManager.GetFoldersFromSection("[ExcludeFolders]")
-                    .Select(p => 
+                    .Select(p =>
                     {
                         try
                         {
@@ -668,17 +669,25 @@ namespace ITM_Agent.Services
                         logManager.LogEvent($"[FileWatcherManager] Manual scan: Error processing path for '{filePath}': {pathEx.Message}. Skipping.");
                         continue;
                     }
+
                     bool recentlyProcessed = false;
                     lock (fileProcessTracker)
                     {
-                        if (fileProcessTracker.TryGetValue(filePath, out var lastProcessed) && (DateTime.UtcNow - lastProcessed).TotalMinutes < 5) recentlyProcessed = true;
+                        if (fileProcessTracker.TryGetValue(filePath, out var lastProcessed) &&
+                            (DateTime.UtcNow - lastProcessed).TotalMinutes < 5)
+                        {
+                            recentlyProcessed = true;
+                        }
                     }
+
                     bool currentlyTracked = false;
                     lock (trackingLock)
                     {
                         currentlyTracked = trackedFiles.ContainsKey(filePath);
                     }
-                    if(recentlyProcessed || currentlyTracked) continue; // 로그 제거됨
+
+                    if(recentlyProcessed || currentlyTracked)
+                        continue; // 로그 제거됨
 
                     if (IsFileReady(filePath))
                     {
@@ -701,6 +710,7 @@ namespace ITM_Agent.Services
                     }
                     // 잠긴 파일 로그 제거됨
                 }
+
                 logManager.LogEvent($"[FileWatcherManager] Manual scan finished for: {folderPath}. Scanned: {scannedFileCount}, Processed: {processedFileCount}.");
             }
             catch (UnauthorizedAccessException uaEx)
