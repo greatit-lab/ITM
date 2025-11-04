@@ -848,5 +848,36 @@ namespace ITM_Agent.ucPanel
                 logManager.LogError($"[UploadPanel] Error 폴더 감시 시작 실패: {ex.Message}");
             }
         }
+
+        // ▼▼▼ 취소 요청 메서드 추가 ▼▼▼
+        public void CancelBackgroundTask()
+        {
+            if (ctsUpload != null && !ctsUpload.IsCancellationRequested)
+            {
+                ctsUpload.Cancel();
+                logManager.LogEvent("[UploadPanel] Background task cancellation requested.");
+            }
+        }
+
+        // ▼▼▼ IDisposable 구현 추가 (선택 사항이지만 권장) ▼▼▼
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                CancelBackgroundTask(); // Dispose 시에도 취소
+                ctsUpload?.Dispose();
+                // 다른 Watcher들도 여기서 Dispose
+                uploadFolderWatcher?.Dispose();
+                preAlignFolderWatcher?.Dispose();
+                errFolderWatcher?.Dispose();
+                imageFolderWatcher?.Dispose();
+                lampFolderWatcher?.Dispose(); // Lamp Watcher 추가
+                if (components != null)
+                {
+                    components.Dispose();
+                }
+            }
+            base.Dispose(disposing);
+        }
     }
 }
