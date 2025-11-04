@@ -449,7 +449,6 @@ namespace ITM_Agent
             {
                 // ▼▼▼ ucUploadPanel 백그라운드 작업 취소 호출 추가 ▼▼▼
                 ucUploadPanel?.CancelBackgroundTask();
-                // ▲▲▲ 추가 끝 ▲▲▲
 
                 fileWatcherManager?.StopWatchers();
                 fileWatcherManager = null; // Dispose는 필요 없을 수 있음 (내부적으로 처리한다면)
