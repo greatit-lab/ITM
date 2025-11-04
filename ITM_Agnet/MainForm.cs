@@ -444,29 +444,33 @@ namespace ITM_Agent
         private void PerformQuit()
         {
             logManager?.LogEvent("[MainForm] Quit requested.");
-            /* 1) 러너 Watcher 안전 종료 */
+            /* 1) 러너 Watcher 및 백그라운드 작업 안전 종료 */
             try
             {
+                // ▼▼▼ ucUploadPanel 백그라운드 작업 취소 호출 추가 ▼▼▼
+                ucUploadPanel?.CancelBackgroundTask();
+                // ▲▲▲ 추가 끝 ▲▲▲
+
                 fileWatcherManager?.StopWatchers();
-                fileWatcherManager = null;
+                fileWatcherManager = null; // Dispose는 필요 없을 수 있음 (내부적으로 처리한다면)
 
                 lampLifeService?.Stop();
-                lampLifeService = null;
+                lampLifeService = null; // Dispose 필요 시 호출
 
-                /* ▼ InfoRetentionCleaner 정리 ▼ */          // [추가]
                 infoCleaner?.Dispose();
                 infoCleaner = null;
-                /* ▲ InfoRetentionCleaner 정리 ▲ */
 
-                // SettingsManager는 Dispose 필요 없음
-                settingsManager = null;
+                // PerformanceDbWriter 중지
+                PerformanceDbWriter.Stop();
+
+                settingsManager = null; // Dispose 필요 없음
             }
             catch (Exception ex)
             {
-                logManager?.LogError($"[MainForm] Clean-up error: {ex}");
+                logManager?.LogError($"[MainForm] Clean-up error during service stop: {ex}");
             }
 
-            /* 2) TrayIcon 정리 */
+            /* 2) TrayIcon 정리 (기존 코드 유지) */
             try
             {
                 if (trayIcon != null)
@@ -490,7 +494,7 @@ namespace ITM_Agent
             BeginInvoke(new Action(() =>
             {
                 logManager?.LogEvent("[MainForm] Application.Exit invoked.");
-                Application.Exit();                   // Environment.Exit → Application.Exit
+                Application.Exit();
             }));
         }
 
