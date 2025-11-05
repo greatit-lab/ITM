@@ -859,7 +859,6 @@ namespace ITM_Agent.ucPanel
             }
         }
 
-        // ▼▼▼ IDisposable 구현 추가 (선택 사항이지만 권장) ▼▼▼
         protected override void Dispose(bool disposing)
         {
             if (disposing)
