@@ -121,9 +121,9 @@ namespace ITM_Agent.ucPanel
             this.btn_WaveClear.TabIndex = 53;
             this.btn_WaveClear.Text = "Clear";
             this.btn_WaveClear.UseVisualStyleBackColor = true;
-            // 
+            //
             // label12
-            // 
+            //
             this.label12.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.label12.Font = new System.Drawing.Font("굴림", 11.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(129)));
             this.label12.Location = new System.Drawing.Point(253, 276);
@@ -165,9 +165,9 @@ namespace ITM_Agent.ucPanel
             this.btn_ErrClear.TabIndex = 43;
             this.btn_ErrClear.Text = "Clear";
             this.btn_ErrClear.UseVisualStyleBackColor = true;
-            // 
+            //
             // label10
-            // 
+            //
             this.label10.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.label10.Font = new System.Drawing.Font("굴림", 11.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(129)));
             this.label10.Location = new System.Drawing.Point(253, 183);
@@ -209,9 +209,9 @@ namespace ITM_Agent.ucPanel
             this.btn_ImgClear.TabIndex = 38;
             this.btn_ImgClear.Text = "Clear";
             this.btn_ImgClear.UseVisualStyleBackColor = true;
-            // 
+            //
             // label9
-            // 
+            //
             this.label9.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.label9.Font = new System.Drawing.Font("굴림", 11.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(129)));
             this.label9.Location = new System.Drawing.Point(253, 134);
@@ -411,9 +411,9 @@ namespace ITM_Agent.ucPanel
             this.btn_LampClear.TabIndex = 48;
             this.btn_LampClear.Text = "Clear";
             this.btn_LampClear.UseVisualStyleBackColor = true;
-            // 
+            //
             // label11
-            // 
+            //
             this.label11.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.label11.Font = new System.Drawing.Font("굴림", 11.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(129)));
             this.label11.Location = new System.Drawing.Point(253, 229);
@@ -430,7 +430,6 @@ namespace ITM_Agent.ucPanel
             this.btn_LampSet.TabIndex = 45;
             this.btn_LampSet.Text = "Set";
             this.btn_LampSet.UseVisualStyleBackColor = true;
-            
             //
             // ucUploadPanel
             //
@@ -443,7 +442,7 @@ namespace ITM_Agent.ucPanel
             this.ResumeLayout(false);
         }
         #endregion
-        
+
         private System.Windows.Forms.Button btn_PreAlignClear;
         private System.Windows.Forms.Label label8;
         private System.Windows.Forms.Button btn_ImgClear;
