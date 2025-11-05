@@ -1,19 +1,9 @@
-// ITM_Agent\ucPanel\ucUploadPanel.Designer.cs
+// ITM_Agent/ucPanel/ucUploadPanel.Designer.cs
 namespace ITM_Agent.ucPanel
 {
     partial class ucUploadPanel
     {
         private System.ComponentModel.IContainer components = null;
-        
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing && (components != null))
-            {
-                components.Dispose();
-            }
-            base.Dispose(disposing);
-        }
-        
         private System.Windows.Forms.GroupBox groupBox1;
         private System.Windows.Forms.Button btn_FlatSet;
         private System.Windows.Forms.Button btn_FlatClear;
@@ -32,9 +22,9 @@ namespace ITM_Agent.ucPanel
         private System.Windows.Forms.Button btn_PreAlignSet;
         private System.Windows.Forms.ComboBox cb_PreAlignPlugin;
         private System.Windows.Forms.ComboBox cb_ImagePlugin;
-        
+
         #region 구성 요소 디자이너에서 생성한 코드
-        
+
         private void InitializeComponent()
         {
             this.groupBox1 = new System.Windows.Forms.GroupBox();
@@ -43,11 +33,6 @@ namespace ITM_Agent.ucPanel
             this.cb_WavePlugin = new System.Windows.Forms.ComboBox();
             this.cb_WavePath = new System.Windows.Forms.ComboBox();
             this.btn_WaveSet = new System.Windows.Forms.Button();
-            this.btn_EvClear = new System.Windows.Forms.Button();
-            this.label11 = new System.Windows.Forms.Label();
-            this.cb_EvPlugin = new System.Windows.Forms.ComboBox();
-            this.cb_EvPath = new System.Windows.Forms.ComboBox();
-            this.btn_EvSet = new System.Windows.Forms.Button();
             this.btn_ErrClear = new System.Windows.Forms.Button();
             this.label10 = new System.Windows.Forms.Label();
             this.cb_ErrPlugin = new System.Windows.Forms.ComboBox();
@@ -74,6 +59,11 @@ namespace ITM_Agent.ucPanel
             this.btn_FlatClear = new System.Windows.Forms.Button();
             this.label1 = new System.Windows.Forms.Label();
             this.label3 = new System.Windows.Forms.Label();
+            this.cb_LampPath = new System.Windows.Forms.ComboBox();
+            this.cb_LampPlugin = new System.Windows.Forms.ComboBox();
+            this.btn_LampClear = new System.Windows.Forms.Button();
+            this.label11 = new System.Windows.Forms.Label();
+            this.btn_LampSet = new System.Windows.Forms.Button();
             this.groupBox1.SuspendLayout();
             this.SuspendLayout();
             //
@@ -84,11 +74,11 @@ namespace ITM_Agent.ucPanel
             this.groupBox1.Controls.Add(this.cb_WavePlugin);
             this.groupBox1.Controls.Add(this.cb_WavePath);
             this.groupBox1.Controls.Add(this.btn_WaveSet);
-            this.groupBox1.Controls.Add(this.btn_EvClear);
+            this.groupBox1.Controls.Add(this.btn_LampClear);
             this.groupBox1.Controls.Add(this.label11);
-            this.groupBox1.Controls.Add(this.cb_EvPlugin);
-            this.groupBox1.Controls.Add(this.cb_EvPath);
-            this.groupBox1.Controls.Add(this.btn_EvSet);
+            this.groupBox1.Controls.Add(this.cb_LampPlugin);
+            this.groupBox1.Controls.Add(this.cb_LampPath);
+            this.groupBox1.Controls.Add(this.btn_LampSet);
             this.groupBox1.Controls.Add(this.btn_ErrClear);
             this.groupBox1.Controls.Add(this.label10);
             this.groupBox1.Controls.Add(this.cb_ErrPlugin);
@@ -115,6 +105,7 @@ namespace ITM_Agent.ucPanel
             this.groupBox1.Controls.Add(this.btn_FlatClear);
             this.groupBox1.Controls.Add(this.label1);
             this.groupBox1.Controls.Add(this.label3);
+            this.groupBox1.Controls.Add(this.cb_LampPlugin);
             this.groupBox1.Location = new System.Drawing.Point(25, 21);
             this.groupBox1.Name = "groupBox1";
             this.groupBox1.Size = new System.Drawing.Size(624, 305);
@@ -165,50 +156,6 @@ namespace ITM_Agent.ucPanel
             this.btn_WaveSet.TabIndex = 50;
             this.btn_WaveSet.Text = "Set";
             this.btn_WaveSet.UseVisualStyleBackColor = true;
-            //
-            // btn_EvClear
-            //
-            this.btn_EvClear.Location = new System.Drawing.Point(543, 226);
-            this.btn_EvClear.Name = "btn_EvClear";
-            this.btn_EvClear.Size = new System.Drawing.Size(75, 22);
-            this.btn_EvClear.TabIndex = 48;
-            this.btn_EvClear.Text = "Clear";
-            this.btn_EvClear.UseVisualStyleBackColor = true;
-            // 
-            // label11
-            // 
-            this.label11.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.label11.Font = new System.Drawing.Font("굴림", 11.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(129)));
-            this.label11.Location = new System.Drawing.Point(253, 229);
-            this.label11.Name = "label11";
-            this.label11.Size = new System.Drawing.Size(25, 22);
-            this.label11.TabIndex = 47;
-            this.label11.Text = "→";
-            //
-            // cb_EvPlugin
-            //
-            this.cb_EvPlugin.FormattingEnabled = true;
-            this.cb_EvPlugin.Location = new System.Drawing.Point(283, 227);
-            this.cb_EvPlugin.Name = "cb_EvPlugin";
-            this.cb_EvPlugin.Size = new System.Drawing.Size(175, 20);
-            this.cb_EvPlugin.TabIndex = 46;
-            //
-            // cb_EvPath
-            //
-            this.cb_EvPath.FormattingEnabled = true;
-            this.cb_EvPath.Location = new System.Drawing.Point(30, 227);
-            this.cb_EvPath.Name = "cb_EvPath";
-            this.cb_EvPath.Size = new System.Drawing.Size(214, 20);
-            this.cb_EvPath.TabIndex = 44;
-            //
-            // btn_EvSet
-            //
-            this.btn_EvSet.Location = new System.Drawing.Point(465, 226);
-            this.btn_EvSet.Name = "btn_EvSet";
-            this.btn_EvSet.Size = new System.Drawing.Size(75, 22);
-            this.btn_EvSet.TabIndex = 45;
-            this.btn_EvSet.Text = "Set";
-            this.btn_EvSet.UseVisualStyleBackColor = true;
             //
             // btn_ErrClear
             //
@@ -384,7 +331,7 @@ namespace ITM_Agent.ucPanel
             this.label6.Name = "label6";
             this.label6.Size = new System.Drawing.Size(146, 22);
             this.label6.TabIndex = 23;
-            this.label6.Text = "• Event Data Path";
+            this.label6.Text = "• Lamp Data Path";
             //
             // label5
             //
@@ -440,6 +387,51 @@ namespace ITM_Agent.ucPanel
             this.label3.TabIndex = 7;
             this.label3.Text = "• Wafer Flat Data Path";
             //
+            // cb_LampPath
+            //
+            this.cb_LampPath.FormattingEnabled = true;
+            this.cb_LampPath.Location = new System.Drawing.Point(30, 227);
+            this.cb_LampPath.Name = "cb_LampPath";
+            this.cb_LampPath.Size = new System.Drawing.Size(214, 20);
+            this.cb_LampPath.TabIndex = 44;
+            //
+            // cb_LampPlugin
+            //
+            this.cb_LampPlugin.FormattingEnabled = true;
+            this.cb_LampPlugin.Location = new System.Drawing.Point(283, 227);
+            this.cb_LampPlugin.Name = "cb_LampPlugin";
+            this.cb_LampPlugin.Size = new System.Drawing.Size(175, 20);
+            this.cb_LampPlugin.TabIndex = 46;
+            //
+            // btn_LampClear
+            //
+            this.btn_LampClear.Location = new System.Drawing.Point(543, 226);
+            this.btn_LampClear.Name = "btn_LampClear";
+            this.btn_LampClear.Size = new System.Drawing.Size(75, 22);
+            this.btn_LampClear.TabIndex = 48;
+            this.btn_LampClear.Text = "Clear";
+            this.btn_LampClear.UseVisualStyleBackColor = true;
+            // 
+            // label11
+            // 
+            this.label11.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.label11.Font = new System.Drawing.Font("굴림", 11.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(129)));
+            this.label11.Location = new System.Drawing.Point(253, 229);
+            this.label11.Name = "label11";
+            this.label11.Size = new System.Drawing.Size(25, 22);
+            this.label11.TabIndex = 47;
+            this.label11.Text = "→";
+            //
+            // btn_LampSet
+            //
+            this.btn_LampSet.Location = new System.Drawing.Point(465, 226);
+            this.btn_LampSet.Name = "btn_LampSet";
+            this.btn_LampSet.Size = new System.Drawing.Size(75, 22);
+            this.btn_LampSet.TabIndex = 45;
+            this.btn_LampSet.Text = "Set";
+            this.btn_LampSet.UseVisualStyleBackColor = true;
+            
+            //
             // ucUploadPanel
             //
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 12F);
@@ -461,11 +453,11 @@ namespace ITM_Agent.ucPanel
         private System.Windows.Forms.ComboBox cb_WavePlugin;
         private System.Windows.Forms.ComboBox cb_WavePath;
         private System.Windows.Forms.Button btn_WaveSet;
-        private System.Windows.Forms.Button btn_EvClear;
+        private System.Windows.Forms.Button btn_LampClear;
         private System.Windows.Forms.Label label11;
-        private System.Windows.Forms.ComboBox cb_EvPlugin;
-        private System.Windows.Forms.ComboBox cb_EvPath;
-        private System.Windows.Forms.Button btn_EvSet;
+        private System.Windows.Forms.ComboBox cb_LampPlugin;
+        private System.Windows.Forms.ComboBox cb_LampPath;
+        private System.Windows.Forms.Button btn_LampSet;
         private System.Windows.Forms.Button btn_ErrClear;
         private System.Windows.Forms.Label label10;
         private System.Windows.Forms.ComboBox cb_ErrPlugin;
